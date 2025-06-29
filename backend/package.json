@@ -1,0 +1,31 @@
+{
+  "name": "wms-tutorial-app-backend",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^16.5.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.16.0",
+    "mongoose": "^8.15.1",
+    "netlify-cli": "^21.5.0"
+  },
+  "scripts": {
+    "start": "netlify dev -p 8889",
+    "build": "echo \"No build step required for backend\"",
+    "test": "node scripts/test-direct-auth.js",
+    "test:auth": "node scripts/test-auth-flow.js",
+    "test:db": "node scripts/test-mongodb-connection.js",
+    "test:presentations": "node scripts/test-presentations.js",
+    "test:processes": "node scripts/test-processes.js",
+    "init:db": "node scripts/initDatabase.js",
+    "deploy": "node deploy-to-netlify.js",
+    "deploy:with-env": "node deploy-with-env.js"
+  },
+  "devDependencies": {
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "node-fetch": "^2.7.0"
+  }
+}

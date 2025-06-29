@@ -1,0 +1,26 @@
+[build]
+  # No build command needed for backend-only deployment
+  command = "echo 'No build step required for serverless functions'"
+  # Use a simple public directory that we'll create
+  publish = "public"
+  functions = "netlify/functions"
+
+[dev]
+  port = 9000
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+  force = true
+  [redirects.headers]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+    Access-Control-Max-Age = "86400"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
