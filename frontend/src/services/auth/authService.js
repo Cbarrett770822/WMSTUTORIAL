@@ -196,7 +196,7 @@ export const getUserByUsername = async (username) => {
     
     if (token) {
       try {
-        const response = await fetch(`${config.apiUrl}/getUser/${username}`, {
+        const response = await fetch(`${config.apiUrl}/.netlify/functions/getUser/${username}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -273,7 +273,7 @@ export const logoutUser = async () => {
     // Revoke token on server if available
     if (token) {
       try {
-        const response = await fetch(`${config.apiUrl}/revoke-token`, {
+        const response = await fetch(`${config.apiUrl}/.netlify/functions/revoke-token`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -571,7 +571,7 @@ export const addUser = async (newUser) => {
     console.log('API URL:', `${config.apiUrl}/add-user`);
     
     // Add user to the database
-    const response = await fetch(`${config.apiUrl}/add-user`, {
+    const response = await fetch(`${config.apiUrl}/.netlify/functions/add-user`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -642,7 +642,7 @@ export const updateUser = async (username, updates) => {
     console.log('API URL:', `${config.apiUrl}/update-user`);
     
     // Update user in the database
-    const response = await fetch(`${config.apiUrl}/update-user`, {
+    const response = await fetch(`${config.apiUrl}/.netlify/functions/update-user`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -712,7 +712,7 @@ export const deleteUser = async (username) => {
     }
     
     // Delete user from the database
-    const response = await fetch(`${config.apiUrl}/delete-user`, {
+    const response = await fetch(`${config.apiUrl}/.netlify/functions/delete-user`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

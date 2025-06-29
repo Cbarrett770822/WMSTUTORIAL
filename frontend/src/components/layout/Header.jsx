@@ -125,7 +125,7 @@ const Header = ({ onLogout }) => {
         
         {/* Logout button in drawer */}
         <ListItem 
-          button={true} 
+          button="true" 
           onClick={() => {
             toggleDrawer();
             if (onLogout) onLogout();

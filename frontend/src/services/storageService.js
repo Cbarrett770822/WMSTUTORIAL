@@ -148,7 +148,7 @@ export const saveProcesses = async (processes, saveToDatabase = false) => {
       }
       
       console.log('Attempting to save processes to database API...');
-      const response = await fetch(`${config.apiUrl}/saveProcesses`, {
+      const response = await fetch(`${config.apiUrl}/.netlify/functions/saveProcesses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -208,7 +208,7 @@ export const loadProcesses = async () => {
     
     // First try to get data from the database with authentication
     console.log(`Fetching processes from API: ${config.apiUrl}/getProcesses`);
-    const response = await fetch(`${config.apiUrl}/getProcesses`, {
+    const response = await fetch(`${config.apiUrl}/.netlify/functions/getProcesses`, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
@@ -289,7 +289,20 @@ export const savePresentations = async (presentations) => {
   try {
     // Make a defensive copy early to avoid proxy issues
     safePresentations = Array.isArray(presentations) ? 
-      presentations.map(presentation => safelyUnproxy(presentation)) : 
+      presentations.map(presentation => {
+        const safePresentation = safelyUnproxy(presentation);
+        
+        // Ensure all presentations have a valid string ID
+        if (!safePresentation.id) {
+          console.warn('Presentation missing ID, generating one:', safePresentation.title || 'Untitled');
+          safePresentation.id = String(Date.now());
+        } else if (typeof safePresentation.id !== 'string') {
+          console.warn('Converting presentation ID to string:', safePresentation.id);
+          safePresentation.id = String(safePresentation.id);
+        }
+        
+        return safePresentation;
+      }) : 
       [];
       
     if (safePresentations.length === 0 && presentations) {
@@ -313,7 +326,7 @@ export const savePresentations = async (presentations) => {
     }
     
     // First save to database
-    const response = await fetch(`${config.apiUrl}/savePresentations`, {
+    const response = await fetch(`${config.apiUrl}/.netlify/functions/savePresentations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -362,8 +375,8 @@ export const loadPresentations = async () => {
     }
     
     // First try to get data from the database with authentication
-    console.log(`Making API request to: ${config.apiUrl}/getPresentations with token`);
-    const response = await fetch(`${config.apiUrl}/getPresentations`, {
+    console.log(`Making API request to: ${config.apiUrl}/.netlify/functions/getPresentations with token`);
+    const response = await fetch(`${config.apiUrl}/.netlify/functions/getPresentations`, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
@@ -719,7 +732,7 @@ export const loadSettings = async (isUserSpecific = true) => {
       // Also try to save to database if we have a token
       if (token && isUserSpecific && userId !== 'guest') {
         try {
-          const response = await fetch(`${config.apiUrl}/save-user-settings`, {
+          const response = await fetch(`${config.apiUrl}/.netlify/functions/save-user-settings`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

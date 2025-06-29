@@ -148,7 +148,7 @@ const ProcessApiDebugger = () => {
         return;
       }
       
-      const response = await fetch(`${config.apiUrl}/getProcesses`, {
+      const response = await fetch(`${config.apiUrl}/.netlify/functions/getProcesses`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

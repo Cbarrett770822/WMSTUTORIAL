@@ -39,10 +39,9 @@ const getAuthToken = () => {
  * @returns {Object} - Headers object
  */
 const createHeaders = (includeAuth = true) => {
+  // Only include essential headers to avoid CORS issues
   const headers = {
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-cache',
-    'Pragma': 'no-cache'
+    'Content-Type': 'application/json'
   };
   
   if (includeAuth) {

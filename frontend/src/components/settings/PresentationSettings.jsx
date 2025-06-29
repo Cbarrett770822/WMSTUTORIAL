@@ -65,12 +65,17 @@ const PresentationSettings = ({ showNotification }) => {
   const [presentationToDelete, setPresentationToDelete] = useState(null);
   const fileInputRef = useRef(null);
   
-  // Fetch presentations from API on component mount
+  // Fetch presentations from API on component mount and when needed
   useEffect(() => {
-    if (status === 'idle') {
-      dispatch(fetchPresentations());
-    }
-  }, [status, dispatch]);
+    // Always fetch fresh data when the component mounts
+    dispatch(fetchPresentations());
+  }, [dispatch]);
+  
+  // Add a refresh function
+  const handleRefreshPresentations = () => {
+    dispatch(fetchPresentations());
+    showNotification('Refreshing presentations...', 'info');
+  };
   
   // Show notification when save status changes
   useEffect(() => {
@@ -112,7 +117,7 @@ const PresentationSettings = ({ showNotification }) => {
     fileInputRef.current.click();
   };
   
-  const handleAddPresentation = () => {
+  const handleAddPresentation = async () => {
     // Validate inputs
     if (!newPresentationTitle) {
       showNotification('Please provide a title for the presentation', 'error');
@@ -142,33 +147,30 @@ const PresentationSettings = ({ showNotification }) => {
     
     // Create new presentation object
     const newPresentation = {
-      id: editMode ? editingPresentationId : Date.now(),
+      id: editMode ? editingPresentationId : String(Date.now()),
       title: newPresentationTitle,
       url: presentationSource === 'online' ? newPresentationUrl : localFilePath,
-      description: newPresentationDescription,
-      isLocal: presentationSource === 'local'
     };
     
-    // Add to presentations array or update existing using Redux
-    if (editMode && editingPresentationId) {
-      // Update existing presentation
-      const updatedPresentation = {
-        id: editingPresentationId,
-        changes: {
-          title: newPresentationTitle,
-          description: newPresentationDescription,
-          url: presentationSource === 'online' ? newPresentationUrl : `/${localFilePath}`,
-          isLocal: presentationSource === 'local',
-          updatedAt: new Date().toISOString()
-        }
-      };
+    try {
+      if (editMode) {
+        // Update existing presentation using the async thunk
+        await dispatch(updatePresentationAsync({ 
+          id: editingPresentationId, 
+          changes: newPresentation 
+        })).unwrap();
+        showNotification(`Presentation "${newPresentationTitle}" updated successfully`, 'success');
+      } else {
+        // Add new presentation using the async thunk
+        await dispatch(addPresentationAsync(newPresentation)).unwrap();
+        showNotification(`Presentation "${newPresentationTitle}" added successfully`, 'success');
+      }
       
-      // Use the async thunk to update presentation and save to MongoDB
-      dispatch(updatePresentationAsync(updatedPresentation));
-      showNotification(`Updating presentation "${newPresentationTitle}"...`, 'info');
-    } else {
-      dispatch(addPresentation(newPresentation));
-      showNotification(`Presentation "${newPresentationTitle}" added successfully`, 'success');
+      // Refresh presentations from the database
+      dispatch(fetchPresentations());
+    } catch (error) {
+      console.error('Error saving presentation:', error);
+      showNotification(`Failed to save presentation: ${error.message}`, 'error');
     }
     
     // Reset form
@@ -204,25 +206,31 @@ const PresentationSettings = ({ showNotification }) => {
     setDeleteDialogOpen(true);
   };
   
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (presentationToDelete) {
-      // Use the async thunk to delete presentation and save to MongoDB
-      dispatch(deletePresentationAsync(presentationToDelete.id));
-      showNotification(`Deleting presentation "${presentationToDelete.title}"...`, 'info');
-      
-      // Reset editing state if the deleted presentation was being edited
-      if (editMode && editingPresentationId === presentationToDelete.id) {
-        setEditMode(false);
-        setEditingPresentationId(null);
-        setNewPresentationTitle('');
-        setNewPresentationUrl('');
-        setNewPresentationDescription('');
-        setLocalFilePath('');
+      try {
+        // Delete the presentation using the async thunk
+        await dispatch(deletePresentationAsync(presentationToDelete.id)).unwrap();
+        
+        // Show notification
+        showNotification(`Presentation "${presentationToDelete.title}" deleted successfully`, 'success');
+        
+        // Refresh presentations from the database
+        dispatch(fetchPresentations());
+      } catch (error) {
+        console.error('Error deleting presentation:', error);
+        showNotification(`Failed to delete presentation: ${error.message}`, 'error');
+      } finally {
+        // Close dialog
+        setDeleteDialogOpen(false);
+        setPresentationToDelete(null);
+        
+        // If we were editing this presentation, reset the form
+        if (editMode && editingPresentationId === presentationToDelete.id) {
+          handleCancelEdit();
+        }
       }
     }
-    
-    setDeleteDialogOpen(false);
-    setPresentationToDelete(null);
   };
   
   const handleCancelEdit = () => {
@@ -250,16 +258,14 @@ const PresentationSettings = ({ showNotification }) => {
       
       {/* List of existing presentations */}
       <Box sx={{ mt: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6">
-            Presentations
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h6" component="h2">
+            Manage Presentations
           </Typography>
-          
-          <Button 
-            variant="outlined" 
+          <Button
+            startIcon={<RefreshIcon />}
+            onClick={handleRefreshPresentations}
             size="small"
-            onClick={() => dispatch(fetchPresentations())}
-            startIcon={status === 'loading' ? <CircularProgress size={20} /> : <RefreshIcon />}
             disabled={status === 'loading'}
           >
             Refresh
@@ -280,7 +286,7 @@ const PresentationSettings = ({ showNotification }) => {
         
         {presentations && presentations.length > 0 ? (
           <List>
-            {presentations.map((presentation) => (
+            {presentations.map((presentation, index) => (
               <ListItem 
                 key={presentation.id}
                 sx={{
@@ -295,9 +301,12 @@ const PresentationSettings = ({ showNotification }) => {
                 </ListItemIcon>
                 <ListItemText
                   primary={presentation.title}
-                  secondary={<>
-                    {presentation.description}
-                    {presentation.isLocal && (
+                  secondary={
+                    <>
+                      <Typography variant="body2" component="span">
+                        {presentation.description}
+                      </Typography>
+                      {presentation.isLocal && (
                         <Typography variant="caption" display="block" color="primary">
                           Local file: {presentation.url}
                         </Typography>
@@ -386,10 +395,14 @@ const PresentationSettings = ({ showNotification }) => {
               <Box sx={{ mt: 0.5, ml: 3, mb: 2 }}>
                 <Typography component="div" variant="caption">
                   <Box component="ul" sx={{ m: 0, p: 0, listStylePosition: 'inside' }}>
-                    <li>Dropbox (use 'Copy link' option)</li>
-                    <li>Google Drive (use 'Share &gt; Anyone with the link')</li>
-                    <li>Google Slides (use 'Share &gt; Anyone with the link')</li>
-                    <li>OneDrive (use 'Share &gt; Anyone with the link')</li>
+                    {[
+                      "Dropbox (use 'Copy link' option)",
+                      "Google Drive (use 'Share > Anyone with the link')",
+                      "Google Slides (use 'Share > Anyone with the link')",
+                      "OneDrive (use 'Share > Anyone with the link')"
+                    ].map((item, idx) => (
+                      <li key={`supported-service-${idx}`}>{item}</li>
+                    ))}
                   </Box>
                 </Typography>
               </Box>

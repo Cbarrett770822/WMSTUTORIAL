@@ -36,12 +36,11 @@ export const getPresentations = async () => {
     
     // Check if the response has the expected structure
     if (response && response.presentations && Array.isArray(response.presentations)) {
-      // Store in localStorage as a backup
-      saveToLocalStorage(response.presentations);
+      // Return the presentations without saving to localStorage
+      // This prevents unnecessary saves when just viewing presentations
       return response.presentations;
     } else if (Array.isArray(response)) {
       // Handle older API format for backward compatibility
-      saveToLocalStorage(response);
       return response;
     } else {
       throw new Error('Invalid response format from API');

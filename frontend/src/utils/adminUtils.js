@@ -27,7 +27,7 @@ export const updateCurrentUserToAdmin = async () => {
     }
     
     // Call the update-admin-role function
-    const response = await fetch(`${config.apiUrl}/update-admin-role`, {
+    const response = await fetch(`${config.apiUrl}/.netlify/functions/update-admin-role`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

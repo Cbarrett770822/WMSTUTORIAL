@@ -11,12 +11,12 @@
  * @returns {Object} - CORS headers
  */
 const getCorsHeaders = (origin = '*') => {
-  // For local development, explicitly allow localhost:3000 or localhost:3006
-  const allowedOrigin = (origin === 'http://localhost:3000' || origin === 'http://localhost:3006') ? origin : '*';
+  // For local development, allow any localhost origin
+  const allowedOrigin = origin && origin.startsWith('http://localhost') ? origin : '*';
   
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cache-Control, Pragma, cache-control, pragma',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Content-Type': 'application/json'
   };

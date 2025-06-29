@@ -433,7 +433,7 @@ export const fetchUserSettings = async () => {
     // Log the token being sent for debugging
     console.log('Sending token:', token.substring(0, 10) + '...');
     
-    const response = await fetch(`${config.apiUrl}/get-user-settings`, {
+    const response = await fetch(`${config.apiUrl}/.netlify/functions/get-user-settings`, {
       method: 'GET',
       headers: {
         // Send token directly without Bearer prefix to match server expectations
@@ -498,7 +498,7 @@ export const saveUserSettingsToServer = async (settings) => {
     // Log the token being sent for debugging
     console.log('Saving settings - token:', token.substring(0, 10) + '...');
     
-    const response = await fetch(`${config.apiUrl}/save-user-settings`, {
+    const response = await fetch(`${config.apiUrl}/.netlify/functions/save-user-settings`, {
       method: 'POST',
       headers: {
         // Send token directly without Bearer prefix to match server expectations

@@ -204,7 +204,7 @@ const Layout = ({ children }) => {
           <List>
             {filteredNavigationItems.map((item) => (
               <ListItem 
-                button 
+                button="true" 
                 key={item.text} 
                 onClick={() => navigate(item.path)}
               >

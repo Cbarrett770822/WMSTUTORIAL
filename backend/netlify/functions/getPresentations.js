@@ -149,7 +149,7 @@ const getPresentationsHandler = async (event, context, { userId, username, role,
 exports.handler = withCors(
   withAuth(
     withDatabase(getPresentationsHandler),
-    { allowUnauthenticated: true } // Allow unauthenticated requests for read-only operation
+    { requireAuth: false } // Allow unauthenticated requests for read-only operation
   ),
   { 
     methods: ['GET'],

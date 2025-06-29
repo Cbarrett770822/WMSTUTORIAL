@@ -43,7 +43,7 @@ const DatabaseViewer = () => {
         return;
       }
       
-      const response = await fetch(`${config.apiUrl}/view-db-data`, {
+      const response = await fetch(`${config.apiUrl}/.netlify/functions/view-db-data`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

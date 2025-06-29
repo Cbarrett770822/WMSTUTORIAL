@@ -601,7 +601,7 @@ export const handleUserLogin = async (userOrId, token = null) => {
       let serverSettings = null;
       if (authToken) {
         // Try to load settings from server using the provided or stored token
-        const response = await fetch(`${config.apiUrl}/get-user-settings`, {
+        const response = await fetch(`${config.apiUrl}/.netlify/functions/get-user-settings`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${authToken}`

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { getPresentations, addPresentation, updatePresentation, deletePresentation } from '../../services/presentationService';
+import { getPresentations } from '../../services/presentationService';
 import { selectIsAdmin, selectIsAuthenticated } from '../../features/auth/authSlice';
-import { initializePresentationsData } from '../../features/presentations/presentationsSlice';
+import { initializePresentationsData, selectPresentations, fetchPresentations } from '../../features/presentations/presentationsSlice';
 import { 
   Container, 
   Typography, 
@@ -19,6 +19,7 @@ const PresentationsPage = () => {
   const dispatch = useDispatch();
   const isAdmin = useSelector(selectIsAdmin);
   const isAuthenticated = useSelector(selectIsAuthenticated);
+  const reduxPresentations = useSelector(selectPresentations);
   const [presentations, setPresentations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -30,15 +31,36 @@ const PresentationsPage = () => {
     // Initialize presentations data from local storage
     if (isAuthenticated) {
       dispatch(initializePresentationsData());
+      // Also fetch fresh data from the server
+      dispatch(fetchPresentations());
     }
   }, [dispatch, isAuthenticated]);
+  
+  // Update local presentations state when Redux state changes
+  useEffect(() => {
+    if (reduxPresentations && reduxPresentations.length > 0) {
+      setPresentations(reduxPresentations);
+      setLoading(false);
+      
+      // If there's a selected presentation, update it with the latest data
+      if (selectedPresentation) {
+        const updated = reduxPresentations.find(p => p.id === selectedPresentation.id || 
+                                      String(p.id) === String(selectedPresentation.id));
+        if (updated && JSON.stringify(updated) !== JSON.stringify(selectedPresentation)) {
+          setSelectedPresentation(updated);
+        }
+      }
+    }
+  }, [reduxPresentations, selectedPresentation]);
 
-  // Load presentations using the presentation service
+  // Load presentations using the presentation service as a fallback
   useEffect(() => {
     const loadPresentations = async () => {
-      // Only attempt to load presentations if user is authenticated
-      if (!isAuthenticated) {
-        console.log('User not authenticated, skipping presentations fetch');
+      // Only attempt to load presentations if user is authenticated and Redux state is empty
+      if (!isAuthenticated || (reduxPresentations && reduxPresentations.length > 0)) {
+        if (!isAuthenticated) {
+          console.log('User not authenticated, skipping presentations fetch');
+        }
         setLoading(false);
         return;
       }
@@ -46,16 +68,9 @@ const PresentationsPage = () => {
       try {
         setLoading(true);
         const data = await getPresentations();
-        setPresentations(data);
-        setError(null);
-        
-        // If there's a selected presentation, update it with the latest data
-        if (selectedPresentation) {
-          const updated = data.find(p => p.id === selectedPresentation.id || 
-                                      String(p.id) === String(selectedPresentation.id));
-          if (updated) {
-            setSelectedPresentation(updated);
-          }
+        if (data && data.length > 0) {
+          setPresentations(data);
+          setError(null);
         }
       } catch (err) {
         console.error('Error loading presentations:', err);
@@ -73,7 +88,7 @@ const PresentationsPage = () => {
     };
     
     loadPresentations();
-  }, [isAuthenticated, retryCount, selectedPresentation?.id]);
+  }, [isAuthenticated, retryCount, reduxPresentations]);
   
   const handlePresentationSelect = (presentation) => {
     setSelectedPresentation(presentation);
@@ -119,7 +134,7 @@ const PresentationsPage = () => {
                 </Typography>
                 {presentations.length > 0 ? (
                   <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
-                    {presentations.map((presentation) => (
+                    {presentations.map((presentation, index) => (
                       <Card 
                         key={presentation.id}
                         variant="outlined" 
@@ -148,13 +163,13 @@ const PresentationsPage = () => {
                           p: 2,
                           '&:last-child': { pb: 2 } // Override Material UI's default padding
                         }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                          <Box key={`${presentation.id}-header`} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                             <SlideshowIcon sx={{ mr: 1, color: 'primary.main', flexShrink: 0 }} />
                             <Typography variant="subtitle1" component="div" noWrap sx={{ fontWeight: 'medium' }}>
                               {presentation.title}
                             </Typography>
                           </Box>
-                          <Typography variant="body2" color="text.secondary" sx={{ 
+                          <Typography key={`${presentation.id}-desc`} variant="body2" color="text.secondary" sx={{ 
                             display: '-webkit-box',
                             WebkitLineClamp: 2,
                             WebkitBoxOrient: 'vertical',
@@ -166,7 +181,7 @@ const PresentationsPage = () => {
                             {presentation.description}
                           </Typography>
                           {presentation.isLocal && (
-                            <Typography variant="caption" display="block" color="primary" sx={{ mt: 'auto' }}>
+                            <Typography key={`${presentation.id}-local`} variant="caption" display="block" color="primary" sx={{ mt: 'auto' }}>
                               Local file
                             </Typography>
                           )}

@@ -8,7 +8,7 @@ const PresentationSchema = new mongoose.Schema({
   },
   userId: {
     type: String,
-    required: true,
+    required: false, // Make userId optional to support global presentations
     index: true // Add index for faster queries by userId
   },
   title: {

@@ -5,11 +5,152 @@ const mongoose = require('mongoose');
 // For simplified authentication
 const isDevelopment = process.env.NODE_ENV === 'development';
 
+// Helper function to determine if an error is a transient transaction error
+const isTransientTransactionError = (error) => {
+  // Check for MongoDB transient transaction error labels
+  if (error.errorLabels && 
+      (error.errorLabels.includes('TransientTransactionError') ||
+       error.errorLabels.includes('UnknownTransactionCommitResult'))) {
+    return true;
+  }
+  
+  // Check for WriteConflict error code
+  if (error.code === 112 || 
+      (error.message && error.message.includes('WriteConflict'))) {
+    return true;
+  }
+  
+  return false;
+};
+
+// Function to save presentations with retry logic for transient errors
+async function savePresentationsWithRetry(presentations, userId, maxRetries = 3) {
+  let lastError = null;
+  let updateResults = [];
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Start a new session for each attempt
+      const session = await mongoose.startSession();
+      
+      try {
+        session.startTransaction();
+        
+        updateResults = [];
+        
+        // Process each presentation
+        for (const presentation of presentations) {
+          // Ensure the presentation has a userId (use the provided userId if not specified)
+          if (!presentation.userId) {
+            presentation.userId = userId;
+          }
+          
+          // Check if this presentation already exists (by id)
+          if (presentation.id) {
+            // Use lean() to avoid potential read conflicts
+            const existingPresentation = await Presentation.findOne(
+              { id: presentation.id },
+              null,
+              { session }
+            ).lean();
+            
+            let updateResult;
+            if (existingPresentation) {
+              // For existing presentations, use findOneAndUpdate without the _id field
+              // to avoid MongoDB duplicate key errors
+              const { _id, ...presentationWithoutId } = presentation;
+              
+              updateResult = await Presentation.findOneAndUpdate(
+                { _id: existingPresentation._id },
+                presentationWithoutId,
+                { new: true, session }
+              );
+              console.log(`Updated existing presentation with id: ${presentation.id}`);
+            } else {
+              // Create new presentation with the provided id
+              // Make sure we don't include any _id field that might have been sent
+              const { _id, ...presentationWithoutId } = presentation;
+              const newPresentation = new Presentation(presentationWithoutId);
+              updateResult = await newPresentation.save({ session });
+              console.log(`Created new presentation with id: ${presentation.id}`);
+            }
+            updateResults.push(updateResult);
+            console.log(`Updated/inserted presentation with id: ${presentation.id}`);
+          } else {
+            // If no id is provided, generate one before creating
+            const presentationWithId = {
+              ...presentation,
+              id: String(Date.now()) // Generate a string ID using current timestamp
+            };
+            const newPresentation = new Presentation(presentationWithId);
+            await newPresentation.save({ session });
+            updateResults.push(newPresentation);
+            console.log('Created new presentation with generated id:', presentationWithId.id);
+          }
+        }
+        
+        console.log(`Updated/inserted ${updateResults.length} presentations`);
+        
+        // Commit the transaction
+        await session.commitTransaction();
+        console.log('Transaction committed successfully');
+        
+        // If we get here, the transaction was successful
+        session.endSession();
+        return updateResults;
+      } catch (transactionError) {
+        // Check if the session is still in a transaction before trying to abort
+        if (session.inTransaction()) {
+          try {
+            await session.abortTransaction();
+            console.log('Transaction aborted due to error');
+          } catch (abortError) {
+            console.error('Error aborting transaction:', abortError);
+          }
+        }
+        
+        // End the session regardless of abort success
+        session.endSession();
+        
+        // If this is a transient error and we have retries left, we'll retry
+        if (isTransientTransactionError(transactionError) && attempt < maxRetries) {
+          lastError = transactionError;
+          const delay = Math.pow(2, attempt) * 500; // Exponential backoff
+          console.log(`Transient transaction error detected, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue; // Try again
+        }
+        
+        // If it's not a transient error or we're out of retries, rethrow
+        throw transactionError;
+      }
+    } catch (error) {
+      lastError = error;
+      
+      // If this is a transient error and we have retries left, we'll retry
+      if (isTransientTransactionError(error) && attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 500; // Exponential backoff
+        console.log(`Transient error detected, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue; // Try again
+      }
+      
+      // If it's not a transient error or we're out of retries, rethrow
+      throw lastError;
+    }
+  }
+  
+  // If we get here, all retries failed
+  throw lastError || new Error('Failed to save presentations after multiple attempts');
+}
+
 exports.handler = async (event, context) => {
   // Set CORS headers for browser clients
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cache-Control, Pragma, X-Requested-With',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Max-Age': '86400',
     'Content-Type': 'application/json'
   };
 
@@ -128,61 +269,19 @@ exports.handler = async (event, context) => {
         timestamp: requestMetadata.timestamp || new Date().toISOString()
       }));
       
-      // Use a session for atomic operations
-      const session = await mongoose.startSession();
-      let result;
+      // Use our retry function to handle transient MongoDB errors
+      const updateResults = await savePresentationsWithRetry(enhancedPresentations, metadataUserId);
+      console.log(`Successfully saved ${updateResults.length} presentations with retry mechanism`);
       
-      try {
-        // Start a transaction
-        session.startTransaction();
-        
-        // Process each presentation individually to update or insert
-        const updateResults = [];
-        
-        for (const presentation of enhancedPresentations) {
-          // Add userId to the presentation for user-specific filtering
-          presentation.userId = metadataUserId || userId;
-          
-          // Try to find an existing presentation with the same id
-          if (presentation.id) {
-            const updateResult = await Presentation.findOneAndUpdate(
-              { id: presentation.id },
-              presentation,
-              { upsert: true, new: true, session }
-            );
-            updateResults.push(updateResult);
-            console.log(`Updated/inserted presentation with id: ${presentation.id}`);
-          } else {
-            // If no id is provided, create a new one
-            const newPresentation = new Presentation(presentation);
-            await newPresentation.save({ session });
-            updateResults.push(newPresentation);
-            console.log('Created new presentation without id');
-          }
-        }
-        
-        console.log(`Updated/inserted ${updateResults.length} presentations`);
-        
-        // Commit the transaction
-        await session.commitTransaction();
-        console.log('Transaction committed successfully');
-      } catch (transactionError) {
-        // If an error occurred, abort the transaction
-        await session.abortTransaction();
-        console.error('Transaction aborted due to error:', transactionError);
-        throw transactionError; // Re-throw to be caught by the outer try-catch
-      } finally {
-        // End the session
-        session.endSession();
-      }
-      
+      // Return success response
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           success: true,
-          message: 'Presentations saved successfully',
-          count: presentations.length
+          message: `Successfully saved ${updateResults.length} presentations`,
+          count: updateResults.length,
+          data: updateResults
         })
       };
     } catch (dbError) {

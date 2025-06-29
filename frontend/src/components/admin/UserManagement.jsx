@@ -311,14 +311,16 @@ const UserManagement = () => {
         </Typography>
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Tooltip title="Refresh users from database">
-            <IconButton 
-              color="primary" 
-              onClick={loadUsers} 
-              disabled={loading}
-              aria-label="refresh users"
-            >
-              <RefreshIcon />
-            </IconButton>
+            <span>
+              <IconButton 
+                color="primary" 
+                onClick={loadUsers} 
+                disabled={loading}
+                aria-label="refresh users"
+              >
+                <RefreshIcon />
+              </IconButton>
+            </span>
           </Tooltip>
           <Button
             variant="contained"

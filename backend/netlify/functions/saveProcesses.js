@@ -9,7 +9,8 @@ exports.handler = async (event, context) => {
   // Set CORS headers for browser clients
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cache-Control, Pragma',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Content-Type': 'application/json'
   };
 
@@ -134,75 +135,135 @@ exports.handler = async (event, context) => {
       updatedBy: userId
     }));
     
-    // Use a session for atomic operations
-    const session = await mongoose.startSession();
-    
-    try {
-      // Start a transaction
-      session.startTransaction();
+    // Function to save processes with retry logic for transient errors
+    async function saveProcessesWithRetry(enhancedProcesses, maxRetries = 3) {
+      let retryCount = 0;
+      let lastError = null;
       
-      // Process each process individually to update or insert
-      const updateResults = [];
-      
-      for (const process of enhancedProcesses) {
+      while (retryCount < maxRetries) {
+        // Use a session for atomic operations
+        const session = await mongoose.startSession();
+        
         try {
-          // Try to find an existing process with the same id
-          if (process.id) {
-            // First check if the process already exists
-            const existingProcess = await Process.findOne({ id: process.id });
-            
-            if (existingProcess) {
-              // If it exists, update it by _id to avoid duplicate key errors
-              const updateResult = await Process.findByIdAndUpdate(
-                existingProcess._id,
-                { $set: process },
-                { new: true, session }
-              );
-              updateResults.push(updateResult);
-              console.log(`Updated existing process with id: ${process.id}`);
-            } else {
-              // If it doesn't exist, create a new one
-              const newProcess = new Process(process);
-              await newProcess.save({ session });
-              updateResults.push(newProcess);
-              console.log(`Created new process with id: ${process.id}`);
+          // Start a transaction
+          session.startTransaction();
+          
+          // Process each process individually to update or insert
+          const updateResults = [];
+          
+          for (const process of enhancedProcesses) {
+            try {
+              // Try to find an existing process with the same id
+              if (process.id) {
+                // First check if the process already exists - do this outside the transaction
+                // to avoid read conflicts
+                const existingProcess = await Process.findOne({ id: process.id }).lean();
+                
+                if (existingProcess) {
+                  // If it exists, update it by _id to avoid duplicate key errors
+                  const updateResult = await Process.findByIdAndUpdate(
+                    existingProcess._id,
+                    { $set: process },
+                    { new: true, session }
+                  );
+                  updateResults.push(updateResult);
+                  console.log(`Updated existing process with id: ${process.id}`);
+                } else {
+                  // If it doesn't exist, create a new one
+                  const newProcess = new Process(process);
+                  await newProcess.save({ session });
+                  updateResults.push(newProcess);
+                  console.log(`Created new process with id: ${process.id}`);
+                }
+              } else {
+                // If no id is provided, create a new one
+                const newProcess = new Process(process);
+                await newProcess.save({ session });
+                updateResults.push(newProcess);
+                console.log('Created new process without id');
+              }
+            } catch (processError) {
+              console.error(`Error processing item with id ${process.id || 'unknown'}:`, processError);
+              throw processError; // Re-throw to be caught by the outer try-catch
             }
-          } else {
-            // If no id is provided, create a new one
-            const newProcess = new Process(process);
-            await newProcess.save({ session });
-            updateResults.push(newProcess);
-            console.log('Created new process without id');
           }
-        } catch (processError) {
-          console.error(`Error processing item with id ${process.id || 'unknown'}:`, processError);
-          throw processError; // Re-throw to be caught by the outer try-catch
+          
+          console.log(`Updated/inserted ${updateResults.length} processes`);
+          
+          // Commit the transaction
+          await session.commitTransaction();
+          console.log('Transaction committed successfully');
+          session.endSession();
+          
+          // Return success result
+          return {
+            success: true,
+            updateResults,
+            message: 'Processes saved successfully',
+            count: updateResults.length
+          };
+        } catch (dbError) {
+          // If an error occurred, abort the transaction
+          try {
+            await session.abortTransaction();
+          } catch (abortError) {
+            console.warn('Error aborting transaction:', abortError);
+          }
+          
+          // Store the last error for potential re-throw
+          lastError = dbError;
+          
+          // Check if this is a transient error that can be retried
+          const isTransientError = 
+            (dbError.errorLabels && 
+             (dbError.errorLabels.includes('TransientTransactionError') || 
+              dbError.errorLabels.includes('UnknownTransactionCommitResult'))) || 
+            dbError.code === 112 || // WriteConflict error code
+            (dbError.message && dbError.message.includes('WriteConflict'));
+          
+          if (isTransientError && retryCount < maxRetries - 1) {
+            retryCount++;
+            console.log(`Transient error detected. Retrying transaction (attempt ${retryCount} of ${maxRetries})...`);
+            // Add a small delay before retrying to reduce contention
+            await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
+          } else {
+            console.error('Transaction aborted due to error:', dbError);
+            session.endSession();
+            throw dbError; // Re-throw to be caught by the outer try-catch
+          }
+        } finally {
+          // Make sure the session is ended
+          if (session.inTransaction()) {
+            try {
+              await session.abortTransaction();
+            } catch (finalError) {
+              console.warn('Error in final abort:', finalError);
+            }
+            session.endSession();
+          }
         }
       }
       
-      console.log(`Updated/inserted ${updateResults.length} processes`);
-      
-      // Commit the transaction
-      await session.commitTransaction();
-      console.log('Transaction committed successfully');
+      // If we've exhausted all retries
+      throw lastError || new Error(`Failed to save processes after ${maxRetries} attempts due to transaction conflicts`);
+    }
+    
+    // Call the retry function and handle the result
+    try {
+      const result = await saveProcessesWithRetry(enhancedProcesses);
       
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({ 
           success: true,
-          message: 'Processes saved successfully',
-          count: updateResults.length
+          message: result.message,
+          count: result.count
         })
       };
     } catch (dbError) {
-      // If an error occurred, abort the transaction
-      await session.abortTransaction();
-      console.error('Transaction aborted due to error:', dbError);
+      console.error('Database error:', dbError);
       throw dbError; // Re-throw to be caught by the outer try-catch
-    } finally {
-      // End the session
-      session.endSession();
     }
   } catch (error) {
     console.error('Database error:', error);

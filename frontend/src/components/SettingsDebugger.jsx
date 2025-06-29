@@ -86,7 +86,7 @@ const SettingsDebugger = () => {
     // Check MongoDB connection
     let mongoStatus = 'Unknown';
     try {
-      const response = await fetch(`${config.apiUrl}/test-mongodb-connection`);
+      const response = await fetch(`${config.apiUrl}/.netlify/functions/test-mongodb-connection`);
       const data = await response.json();
       mongoStatus = data.success ? 'Connected' : 'Error: ' + data.message;
     } catch (error) {
