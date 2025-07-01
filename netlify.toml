@@ -1,0 +1,38 @@
+[build]
+  # Build command for the frontend
+  command = "cd frontend && npm install && npm run build"
+  # Directory with the built frontend assets
+  publish = "frontend/build"
+  # Directory with serverless functions
+  functions = "backend/netlify/functions"
+
+[dev]
+  command = "npm run start"
+  port = 8888
+  targetPort = 3000
+  publish = "frontend/build"
+  functionsPort = 8889
+
+# Redirect API requests to serverless functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+  force = true
+  [redirects.headers]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+    Access-Control-Max-Age = "86400"
+
+# Direct access to functions
+[[redirects]]
+  from = "/.netlify/functions/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# SPA fallback for React Router
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
