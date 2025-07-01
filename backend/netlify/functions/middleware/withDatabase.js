@@ -7,8 +7,18 @@
 
 const mongoose = require('mongoose');
 
-// MongoDB connection URI - in production, this should be an environment variable
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/wms-tutorial';
+// MongoDB Atlas connection URI - always use Atlas in production
+let MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://charlesbtt7722:8LwMaauBS4Opqody@cluster0.eslgbjq.mongodb.net/wms-tutorial?retryWrites=true&w=majority';
+
+// Ensure we never try to connect to localhost in production
+if (MONGODB_URI.includes('localhost') || MONGODB_URI.includes('127.0.0.1')) {
+  console.warn('Warning: Attempting to use localhost MongoDB in production environment');
+  // Force use of MongoDB Atlas in production
+  if (process.env.NODE_ENV === 'production') {
+    console.log('Forcing MongoDB Atlas connection in production');
+    MONGODB_URI = 'mongodb+srv://charlesbtt7722:8LwMaauBS4Opqody@cluster0.eslgbjq.mongodb.net/wms-tutorial?retryWrites=true&w=majority';
+  }
+}
 
 // Track connection status to avoid multiple connections
 let isConnected = false;
