@@ -1,0 +1,13 @@
+{
+  "name": "wms-tutorial-netlify-functions",
+  "version": "1.0.0",
+  "description": "Netlify Functions for WMS Tutorial App",
+  "dependencies": {
+    "xlsx": "^0.18.5",
+    "mongodb": "^6.16.0",
+    "mongoose": "^8.15.1",
+    "bcryptjs": "^3.0.2",
+    "jsonwebtoken": "^9.0.2",
+    "dotenv": "^16.5.0"
+  }
+}

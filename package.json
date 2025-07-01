@@ -1,4 +1,14 @@
 {
+  "name": "wms-tutorial",
+  "version": "1.0.0",
+  "description": "WMS Tutorial Full Stack Application",
+  "main": "index.js",
+  "scripts": {
+    "start": "cd frontend && npm start",
+    "build": "cd frontend && npm run build",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "install:functions": "cd backend/netlify/functions && npm install"
+  },
   "dependencies": {
     "axios": "^1.10.0",
     "bcryptjs": "^3.0.2",
@@ -8,7 +18,10 @@
     "http-proxy-middleware": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.16.1",
-    "node-fetch": "^3.3.2",
-    "uuid": "^11.1.0"
+    "node-fetch": "^2.7.0",
+    "uuid": "^11.1.0",
+    "xlsx": "^0.18.5",
+    "exceljs": "^4.4.0",
+    "multer": "^2.0.1"
   }
 }
