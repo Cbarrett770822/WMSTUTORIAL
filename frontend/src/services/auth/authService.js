@@ -9,7 +9,7 @@ import { hashPassword, verifyPassword } from '../../utils/passwordUtils';
 import { loadProcesses, loadPresentations, loadProcessesSync, loadPresentationsSync } from '../storageService';
 import * as unifiedSettingsService from '../settings/unifiedSettingsService';
 import config from '../../config';
-import { shouldUseDevelopmentFallbacks } from '../../utils/environmentUtils';
+import { shouldUseDevelopmentFallbacks, isDevelopmentEnvironment } from '../../utils/environmentUtils';
 import { processApiResponse, logDiagnostics, handleApiError } from '../../utils/apiResponseUtils';
 import { 
   extractTokenFromHeader, 
@@ -339,7 +339,8 @@ export const logoutUser = async () => {
  * @returns {Promise<Object>} Authentication result
  */
 export const authenticateUser = async (username, password) => {
-  const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+  // Use the imported function to check development environment
+  const isDevelopment = isDevelopmentEnvironment();
   const disableFallback = config?.development?.disableFallback === true || process.env.DISABLE_DEV_FALLBACK === 'true';
   
   console.log('Authenticating user:', username, 'in environment:', isDevelopment ? 'development' : 'production');

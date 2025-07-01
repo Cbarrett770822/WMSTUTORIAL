@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { getPresentations } from '../../services/presentationService';
 import { selectIsAdmin, selectIsAuthenticated } from '../../features/auth/authSlice';
-import { initializePresentationsData, selectPresentations, fetchPresentations } from '../../features/presentations/presentationsSlice';
+import { initializePresentationsData, selectPresentations, fetchPresentations, setSkipSave } from '../../features/presentations/presentationsSlice';
 import { 
   Container, 
   Typography, 
@@ -24,14 +24,14 @@ const PresentationsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedPresentation, setSelectedPresentation] = useState(null);
-  const [retryCount, setRetryCount] = useState(0);
+  const retryCountRef = useRef(0);
   
-  // Initialize presentations data from local storage when component mounts
+  // Always fetch presentations from API when component mounts
   useEffect(() => {
-    // Initialize presentations data from local storage
     if (isAuthenticated) {
+      // Mark as initialized but don't load from localStorage
       dispatch(initializePresentationsData());
-      // Also fetch fresh data from the server
+      // Fetch fresh data from the API
       dispatch(fetchPresentations());
     }
   }, [dispatch, isAuthenticated]);
@@ -51,19 +51,20 @@ const PresentationsPage = () => {
         }
       }
     }
-  }, [reduxPresentations, selectedPresentation]);
+  }, [reduxPresentations]); // Only depend on reduxPresentations, not selectedPresentation
 
-  // Load presentations using the presentation service as a fallback
+  // Load presentations directly from API, ignoring any cached data
   useEffect(() => {
     const loadPresentations = async () => {
-      // Only attempt to load presentations if user is authenticated and Redux state is empty
-      if (!isAuthenticated || (reduxPresentations && reduxPresentations.length > 0)) {
-        if (!isAuthenticated) {
-          console.log('User not authenticated, skipping presentations fetch');
-        }
+      // Only attempt to load presentations if user is authenticated
+      if (!isAuthenticated) {
+        console.log('User not authenticated, skipping presentations fetch');
         setLoading(false);
         return;
       }
+      
+      // Always load from API, even if Redux state has data
+      // This ensures we always have the latest data
       
       try {
         setLoading(true);
@@ -72,14 +73,21 @@ const PresentationsPage = () => {
           setPresentations(data);
           setError(null);
         }
+        // Reset retry count on success
+        retryCountRef.current = 0;
       } catch (err) {
         console.error('Error loading presentations:', err);
         setError('Failed to load presentations. Please try again later.');
         
-        // Retry loading after a delay if authentication state changes
-        if (retryCount < 3 && isAuthenticated) {
+        // Use ref for retry logic to avoid dependency on state updates
+        if (retryCountRef.current < 3 && isAuthenticated) {
+          retryCountRef.current += 1;
+          console.log(`Retry attempt ${retryCountRef.current} of 3`);
+          // Schedule retry after delay without updating state
           setTimeout(() => {
-            setRetryCount(prev => prev + 1);
+            if (isAuthenticated) {
+              loadPresentations();
+            }
           }, 2000);
         }
       } finally {
@@ -88,10 +96,12 @@ const PresentationsPage = () => {
     };
     
     loadPresentations();
-  }, [isAuthenticated, retryCount, reduxPresentations]);
+  }, [isAuthenticated, reduxPresentations]); // Don't include retryCount in dependencies
   
   const handlePresentationSelect = (presentation) => {
     setSelectedPresentation(presentation);
+    // Set skipSave to false to ensure any subsequent changes will be saved
+    dispatch(setSkipSave(false));
   };
   
   // Handle presentation errors
@@ -108,62 +118,44 @@ const PresentationsPage = () => {
           PowerPoint Presentations
         </Typography>
         
-        <Typography variant="body1" component="div">
-          Browse and view presentations related to warehouse management processes.
-        </Typography>
-        
-        {loading && (
+        {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
             <CircularProgress />
           </Box>
-        )}
-        
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
-      
-      {!loading && !error && (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        ) : error ? (
+          <Alert severity="error" sx={{ my: 2 }}>{error}</Alert>
+        ) : (
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
           <Box sx={{ flex: { xs: '1 1 100%', md: '1 1 calc(33.333% - 16px)' }, minWidth: { xs: '100%', md: 'calc(33.333% - 16px)' } }}>
-            <Card elevation={3}>
+            <Card variant="outlined" sx={{ height: '100%' }}>
               <CardContent>
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="h6" component="h2" gutterBottom>
                   Available Presentations
                 </Typography>
-                {presentations.length > 0 ? (
-                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
-                    {presentations.map((presentation, index) => (
+                
+                {presentations && presentations.length > 0 ? (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+                    {presentations.map((presentation) => (
                       <Card 
-                        key={presentation.id}
+                        key={presentation.id} 
                         variant="outlined" 
                         sx={{ 
-                          height: 140,
-                          display: 'flex',
-                          flexDirection: 'column',
                           cursor: 'pointer',
-                          bgcolor: selectedPresentation?.id === presentation.id || 
-                                  String(selectedPresentation?.id) === String(presentation.id) ? 
-                                  'rgba(25, 118, 210, 0.08)' : 'transparent',
-                          border: selectedPresentation?.id === presentation.id || 
-                                 String(selectedPresentation?.id) === String(presentation.id) ? 
-                                 '1px solid #1976d2' : '1px solid rgba(0, 0, 0, 0.12)',
-                          '&:hover': {
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                            borderColor: '#1976d2'
-                          }
+                          bgcolor: selectedPresentation?.id === presentation.id ? 'action.selected' : 'background.paper',
+                          '&:hover': { bgcolor: 'action.hover' },
+                          display: 'flex',
+                          flexDirection: 'column'
                         }}
                         onClick={() => handlePresentationSelect(presentation)}
                       >
                         <CardContent sx={{ 
-                          flexGrow: 1, 
                           display: 'flex', 
-                          flexDirection: 'column', 
-                          p: 2,
-                          '&:last-child': { pb: 2 } // Override Material UI's default padding
+                          flexDirection: 'column',
+                          height: '100%',
+                          p: 2, 
+                          '&:last-child': { pb: 2 } 
                         }}>
-                          <Box key={`${presentation.id}-header`} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                             <SlideshowIcon sx={{ mr: 1, color: 'primary.main', flexShrink: 0 }} />
                             <Typography variant="subtitle1" component="div" noWrap sx={{ fontWeight: 'medium' }}>
                               {presentation.title}
@@ -179,6 +171,16 @@ const PresentationsPage = () => {
                             mb: 1
                           }}>
                             {presentation.description}
+                          </Typography>
+                          <Typography key={`${presentation.id}-url`} variant="caption" color="text.secondary" sx={{ 
+                            display: 'block',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            mb: 1,
+                            fontSize: '0.7rem'
+                          }}>
+                            URL: {presentation.directUrl || presentation.url}
                           </Typography>
                           {presentation.isLocal && (
                             <Typography key={`${presentation.id}-local`} variant="caption" display="block" color="primary" sx={{ mt: 'auto' }}>
@@ -242,12 +244,7 @@ const PresentationsPage = () => {
               </Box>
             )}
             
-            <Alert severity="info" sx={{ mt: 2 }}>
-              <Typography variant="body2" component="div">
-                Note: The PowerPoint viewer requires the presentation to be hosted at a publicly accessible URL.
-                For security reasons, Microsoft's Office Online viewer only works with presentations hosted on public servers.
-              </Typography>
-            </Alert>
+            {/* Alert removed as per user request */}
           </Box>
         </Box>
       )}
