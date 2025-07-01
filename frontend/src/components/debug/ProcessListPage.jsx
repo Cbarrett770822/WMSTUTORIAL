@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { fetchProcesses } from '../../features/processes/processesSlice';
 import { 
   Box, 
   Typography, 
@@ -22,21 +20,60 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
  * Simple page that lists all processes with their steps and URLs
  */
 const ProcessListPage = () => {
-  const dispatch = useDispatch();
-  const { processes, status, error } = useSelector(state => state.processes);
+  const [processes, setProcesses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   
-  // Fetch processes on component mount
+  // Fetch processes directly from API on component mount
   useEffect(() => {
-    setIsLoading(true);
-    // Always fetch fresh data with cache bypass
-    dispatch(fetchProcesses({ bypassCache: true }))
-      .finally(() => setIsLoading(false));
-  }, [dispatch]);
+    const fetchProcessesDirectly = async () => {
+      setIsLoading(true);
+      try {
+        // Get token from localStorage
+        const token = localStorage.getItem('wms_auth_token');
+        if (!token) {
+          throw new Error('Authentication token not found');
+        }
+        
+        // Add timestamp to prevent caching
+        const timestamp = Date.now();
+        const apiUrl = `/.netlify/functions/getProcesses?t=${timestamp}`;
+        
+        // Make direct API call
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          cache: 'no-cache'
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Processes fetched directly:', data);
+        
+        // Save to state
+        setProcesses(data.processes || []);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching processes:', err);
+        setError(err.message);
+        setProcesses([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchProcessesDirectly();
+  }, []);
   
   // Group processes by category
   const processCategories = {};
-  if (processes) {
+  if (processes && processes.length > 0) {
     processes.forEach(process => {
       const category = process.category || 'Uncategorized';
       if (!processCategories[category]) {
