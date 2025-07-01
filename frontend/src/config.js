@@ -1,16 +1,15 @@
 // Client-side configuration
 const config = {
-  // API base URL - use our test server for local testing
-  // Use this for local testing with our test server
-  apiUrl: 'http://localhost:8889',
-  
-  // Use this for production or with proper backend setup
-  // apiUrl: '/api',
+  // API base URL
+  // Check if we're in production (Netlify) or development environment
+  apiUrl: process.env.NODE_ENV === 'production' 
+    ? '' // Empty string for same-origin requests in production
+    : 'http://localhost:8889', // Local development server
   
   // Development mode settings
   development: {
     disableFallback: false, // Enable development fallbacks
-    debugMode: true
+    debugMode: process.env.NODE_ENV !== 'production'
   }
 };
 
