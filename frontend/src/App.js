@@ -29,7 +29,7 @@ import AuthDebugger from './components/debug/AuthDebugger';
 import ProcessApiDebugger from './components/debug/ProcessApiDebugger';
 import ProcessListPage from './components/debug/ProcessListPage';
 import PresentationsApiDebugger from './components/debug/PresentationsApiDebugger';
-import PresentationDebugger from './components/debug/PresentationDebugger';
+import PresentationDebugger from './components/debug/PresentationDebuggerFixed';
 import RoleDebugger from './components/debug/RoleDebugger';
 import DebugPage from './pages/DebugPage';
 import ProtectedRoute, { AdminRoute, SupervisorRoute } from './components/layout/ProtectedRoute';
