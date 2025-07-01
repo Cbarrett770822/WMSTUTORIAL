@@ -73,12 +73,8 @@ const cachePresentations = (presentations) => {
   return presentations;
 };
 
-// Get all presentations from database
+// Get all presentations from database - no localStorage caching
 export const fetchPresentations = async () => {
-  // Load cached data for immediate display while we fetch from database
-  const cachedPresentations = loadCachedPresentations();
-  
-  // Always try to fetch from database, regardless of development mode
   try {
     console.log('Fetching presentations from database...');
     const controller = new AbortController();
@@ -110,17 +106,16 @@ export const fetchPresentations = async () => {
       return { presentations: [], source: 'database', success: true };
     }
     
-    // Cache the database data to localStorage for faster loading next time
-    cachePresentations(processedResponse.presentations);
+    // Do not cache to localStorage
     return processedResponse;
   } catch (error) {
-    // Handle API errors consistently
-    const errorResponse = handleApiError(error, 'presentations', cachedPresentations);
-    
-    // If database fetch fails, use cached data but indicate the error
+    // Handle API errors consistently but don't use cached data
+    console.error('Error fetching presentations from API:', error);
     return { 
-      ...errorResponse,
-      source: 'cache'
+      presentations: [],
+      source: 'api',
+      success: false,
+      error: error.message
     };
   }
 };
@@ -164,61 +159,63 @@ export const savePresentationsToApi = async (presentations) => {
 };
 
 // Get all processes
-export const fetchProcesses = async () => {
-  // Load cached data for immediate display while we fetch from database
-  let cachedProcesses = [];
-  const storedProcesses = localStorage.getItem('wms_processes');
-  if (storedProcesses) {
-    try {
-      cachedProcesses = JSON.parse(storedProcesses);
-    } catch (error) {
-      console.error('Error parsing stored processes:', error);
-    }
-  }
-  
-  // Always try to fetch from database
+export const fetchProcesses = async (options = {}) => {
+  const { bypassCache = true } = options; // Default to true to always bypass cache
   try {
-    console.log('Fetching processes from database...');
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    console.log('Fetching processes from API...');
     
-    const response = await fetch(API_ENDPOINTS.PROCESSES, {
-      signal: controller.signal,
-      headers: createHeaders(true) // Include auth token
+    // Always clear any cached process data
+    localStorage.removeItem('wms_process_data');
+    localStorage.removeItem('wms_processes');
+    
+    // Always add a timestamp parameter for cache busting
+    const timestamp = options.timestamp || Date.now();
+    const fetchUrl = `${API_ENDPOINTS.PROCESSES}?t=${timestamp}`;
+    
+    console.log('Using URL with cache-busting parameter:', fetchUrl);
+    
+    // Always use cache: 'no-cache' to prevent browser caching
+    const headers = await createHeaders();
+    console.log('Fetching from URL:', fetchUrl);
+    const response = await fetch(fetchUrl, { 
+      headers,
+      cache: 'no-cache',
+      credentials: 'same-origin'
     });
     
-    clearTimeout(timeoutId);
-    
     if (!response.ok) {
-      throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+      throw new Error(`Error fetching processes: ${response.status}`);
     }
     
-    const responseData = await response.json();
-    console.log('Successfully fetched processes from database');
+    const data = await response.json();
+    console.log('Raw API response data:', data);
     
-    // Log diagnostics if available
-    logDiagnostics(responseData);
+    if (data.processes && Array.isArray(data.processes)) {
+      console.log(`API returned ${data.processes.length} processes`);
+      
+      // Log each process to check titles
+      data.processes.forEach((process, index) => {
+        console.log(`Process ${index + 1} from API:`);
+        console.log(`  ID: ${process._id || process.id}`);
+        console.log(`  Title: ${process.title || 'NO TITLE'}`);
+        console.log(`  Name: ${process.name || 'NO NAME'}`);
+        console.log(`  Category: ${process.category || 'NO CATEGORY'}`);
+      });
+    }
     
     // Process the standardized response format
-    const processedResponse = processApiResponse(responseData, 'processes', []);
+    const processedResponse = processApiResponse(data, 'processes', []);
     
-    // If we got empty data from the API, return empty array
-    if (!processedResponse.processes || processedResponse.processes.length === 0) {
-      console.log('Database returned empty processes');
-      return { processes: [], source: 'database', success: true };
-    }
-    
-    // Cache the database data to localStorage for faster loading next time
-    localStorage.setItem('wms_processes', JSON.stringify(processedResponse.processes));
     return processedResponse;
   } catch (error) {
-    // Handle API errors consistently
-    const errorResponse = handleApiError(error, 'processes', cachedProcesses);
+    console.error('Error fetching processes:', error);
     
-    // If database fetch fails, use cached data but indicate the error
+    // Return empty array instead of cached data
     return { 
-      ...errorResponse,
-      source: 'cache'
+      processes: [],
+      source: 'api-error',
+      success: false,
+      error: error.message
     };
   }
 };
@@ -227,20 +224,52 @@ export const fetchProcesses = async () => {
 export const saveProcessesToApi = async (processes) => {
   // Always save to database
   try {
+    console.log('saveProcessesToApi called with processes:', JSON.stringify(processes));
+    
     // Cache the data locally while we save to database
     localStorage.setItem('wms_processes', JSON.stringify(processes));
+    
+    // Get current user information for metadata
+    const userJson = localStorage.getItem('wms_current_user');
+    let user = null;
+    if (userJson) {
+      try {
+        user = JSON.parse(userJson);
+        console.log('Current user for process save:', user.username);
+      } catch (e) {
+        console.warn('Error parsing current user:', e);
+      }
+    }
+    
+    // Format the request body as expected by the backend
+    const requestBody = {
+      processes: processes,
+      metadata: {
+        userId: user?.id || 'unknown',
+        username: user?.username || 'unknown',
+        timestamp: new Date().toISOString()
+      }
+    };
+    
+    console.log('Sending request to saveProcesses endpoint:', JSON.stringify(requestBody));
+    console.log('Request URL:', API_ENDPOINTS.SAVE_PROCESSES);
     
     const response = await fetch(API_ENDPOINTS.SAVE_PROCESSES, {
       method: 'POST',
       headers: createHeaders(true), // Include auth token
-      body: JSON.stringify(processes),
+      body: JSON.stringify(requestBody),
     });
     
+    console.log('saveProcesses response status:', response.status, response.statusText);
+    
     if (!response.ok) {
-      throw new Error(`Failed to save processes: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Error response from saveProcesses:', errorText);
+      throw new Error(`Failed to save processes: ${response.status} ${response.statusText} - ${errorText}`);
     }
     
     const responseData = await response.json();
+    console.log('saveProcesses response data:', responseData);
     
     // Log diagnostics if available
     logDiagnostics(responseData);

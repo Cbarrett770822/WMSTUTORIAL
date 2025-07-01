@@ -224,6 +224,29 @@ const ProcessApiDebugger = () => {
     }
   };
 
+  const clearAllCaches = () => {
+    // Clear localStorage completely
+    console.log('Clearing all localStorage items...');
+    localStorage.clear();
+    
+    // Clear sessionStorage
+    console.log('Clearing sessionStorage...');
+    sessionStorage.clear();
+    
+    // Force fetch from database with cache bypass and timestamp
+    console.log('Forcing API cache bypass with timestamp...');
+    dispatch(fetchProcesses({ bypassCache: true, timestamp: Date.now() }));
+    
+    // Set status message
+    setError('All caches cleared. Fetching fresh data...');
+    
+    // Reload the page after a short delay to ensure complete refresh
+    setTimeout(() => {
+      console.log('Reloading page to ensure complete refresh');
+      window.location.reload();
+    }, 2000);
+  };
+
   return (
     <Paper sx={{ p: 3, m: 2, maxWidth: 800 }}>
       <Typography variant="h4" gutterBottom>Process API Debugger</Typography>
@@ -302,6 +325,13 @@ const ProcessApiDebugger = () => {
           </Button>
           <Button variant="contained" onClick={handleTestProcessesEndpoint}>
             Test Processes API
+          </Button>
+          <Button 
+            variant="contained" 
+            color="error" 
+            onClick={clearAllCaches}
+          >
+            Clear All Caches
           </Button>
         </Box>
         
