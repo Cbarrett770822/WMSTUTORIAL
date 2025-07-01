@@ -7,14 +7,10 @@ import {
   Typography,
   Button,
   Divider,
-  Paper,
-  Tabs,
-  Tab
+  Paper
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import FlowPlayer from './FlowPlayer';
-import EditableBenefitsSection from './EditableBenefitsSection';
-import EditableStepsList from './EditableStepsList';
+import SimpleFlowPlayer from './SimpleFlowPlayer';
 import { 
   selectProcess, 
   selectSelectedProcess 
@@ -25,8 +21,6 @@ const FlowPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const process = useSelector(selectSelectedProcess);
-  const [tabValue, setTabValue] = React.useState(0);
-  const isAdmin = useSelector(state => state.auth.user?.role === 'admin');
 
   useEffect(() => {
     // Select the process based on the URL parameter
@@ -39,10 +33,6 @@ const FlowPage = () => {
 
   const handleBackClick = () => {
     navigate('/processes');
-  };
-
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
   };
 
   if (!process) {
@@ -77,31 +67,7 @@ const FlowPage = () => {
         </Button>
       </Box>
 
-      <Paper sx={{ mb: 3 }}>
-        <Tabs
-          value={tabValue}
-          onChange={handleTabChange}
-          indicatorColor="primary"
-          textColor="primary"
-          centered
-        >
-          <Tab label="Flow" />
-          <Tab label="Benefits" />
-          {isAdmin && <Tab label="Edit Steps" />}
-        </Tabs>
-      </Paper>
-
-      <Box sx={{ display: tabValue === 0 ? 'block' : 'none' }}>
-        <FlowPlayer />
-      </Box>
-
-      <Box sx={{ display: tabValue === 1 ? 'block' : 'none' }}>
-        <EditableBenefitsSection />
-      </Box>
-      
-      <Box sx={{ display: tabValue === 2 ? 'block' : 'none' }}>
-        <EditableStepsList />
-      </Box>
+      <SimpleFlowPlayer />
     </Container>
   );
 };
