@@ -10,9 +10,15 @@ const User = require('./models/User');
 const withDatabase = require('./middleware/withDatabase');
 const withCors = require('./middleware/withCors');
 
+// Define environment variables and defaults
+const isDevelopment = process.env.NODE_ENV !== 'production';
+const disableDevFallback = process.env.DISABLE_DEV_FALLBACK === 'true';
+const defaultUsers = ['admin', 'supervisor', 'user'];
+
 // For debugging
 console.log('Login function initialized');
 console.log('Environment:', process.env.NODE_ENV || 'not set');
+console.log('Is Development:', isDevelopment);
 console.log('Database authentication enabled - always using database');
 
 // Core handler function that will be wrapped with middleware
