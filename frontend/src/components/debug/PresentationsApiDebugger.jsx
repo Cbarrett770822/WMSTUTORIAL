@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Typography, Button, TextField, Paper, Divider, Alert, CircularProgress } from '@mui/material';
 import { loadPresentations, savePresentations, AUTH_TOKEN_KEY } from '../../services/storageService';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchPresentations, selectPresentations, selectPresentationsStatus } from '../../features/presentations/presentationsSlice';
+import { fetchPresentations, selectPresentations, selectPresentationsStatus, setSkipSaveAction } from '../../features/presentations/presentationsSlice';
 
 /**
  * A debug component to test the Presentations API functionality
@@ -110,6 +110,9 @@ const PresentationsApiDebugger = () => {
     try {
       setIsLoading(true);
       setError(null);
+      
+      // Ensure skipSave is set to false to allow saving to backend
+      dispatch(setSkipSaveAction(false));
       const testPresentations = [
         {
           id: 'test-presentation-1',

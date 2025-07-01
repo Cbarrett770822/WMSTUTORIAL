@@ -44,7 +44,8 @@ import {
   addPresentationAsync,
   updatePresentationAsync,
   deletePresentationAsync,
-  savePresentationsToDatabase
+  savePresentationsToDatabase,
+  setSkipSaveAction
 } from '../../features/presentations/presentationsSlice';
 
 const PresentationSettings = ({ showNotification }) => {
@@ -124,6 +125,9 @@ const PresentationSettings = ({ showNotification }) => {
       return;
     }
     
+    // Ensure skipSave is set to false to allow saving to backend
+    dispatch(setSkipSaveAction(false));
+    
     if (presentationSource === 'online' && !newPresentationUrl) {
       showNotification('Please enter a URL for the presentation', 'error');
       return;
@@ -188,6 +192,9 @@ const PresentationSettings = ({ showNotification }) => {
     setNewPresentationTitle(presentation.title);
     setNewPresentationDescription(presentation.description || '');
     
+    // Ensure skipSave is set to false to allow saving to backend
+    dispatch(setSkipSaveAction(false));
+    
     if (presentation.isLocal) {
       setPresentationSource('local');
       setLocalFilePath(presentation.url);
@@ -208,6 +215,9 @@ const PresentationSettings = ({ showNotification }) => {
   
   const handleDeleteConfirm = async () => {
     if (presentationToDelete) {
+      // Ensure skipSave is set to false to allow saving to backend
+      dispatch(setSkipSaveAction(false));
+      
       try {
         // Delete the presentation using the async thunk
         await dispatch(deletePresentationAsync(presentationToDelete.id)).unwrap();

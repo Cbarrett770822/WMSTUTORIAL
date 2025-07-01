@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { getPresentations } from '../../services/presentationService';
 import { selectIsAdmin, selectIsAuthenticated } from '../../features/auth/authSlice';
-import { initializePresentationsData, selectPresentations, fetchPresentations, setSkipSave } from '../../features/presentations/presentationsSlice';
+import { initializePresentationsData, selectPresentations, fetchPresentations, setSkipSaveAction } from '../../features/presentations/presentationsSlice';
 import { 
   Container, 
   Typography, 
@@ -101,7 +101,7 @@ const PresentationsPage = () => {
   const handlePresentationSelect = (presentation) => {
     setSelectedPresentation(presentation);
     // Set skipSave to false to ensure any subsequent changes will be saved
-    dispatch(setSkipSave(false));
+    dispatch(setSkipSaveAction(false));
   };
   
   // Handle presentation errors

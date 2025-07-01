@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { loadPresentations, savePresentations, hasStoredPresentations, AUTH_TOKEN_KEY } from '../../services/storageService';
+import { AUTH_TOKEN_KEY } from '../../services/storageService';
 import { savePresentationsToApi } from '../../services/apiService';
 import config from '../../config';
 
@@ -13,20 +13,22 @@ export const fetchPresentations = createAsyncThunk(
       console.log('fetchPresentations: isAuthenticated =', isAuthenticated);
       
       if (!isAuthenticated) {
-        console.log('User not authenticated, using cached presentations');
-        // Return cached presentations without making API call
-        return loadInitialPresentations();
+        console.log('User not authenticated, cannot load presentations');
+        // Return empty array without making API call
+        return [];
       }
       
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
       console.log('fetchPresentations: token exists =', !!token);
       if (!token) {
-        console.log('No authentication token found, using cached presentations');
-        return loadInitialPresentations();
+        console.log('No authentication token found, cannot load presentations');
+        return [];
       }
 
       // Log the API URL and token format for debugging
-      const presentationsUrl = `${config.apiUrl.replace(/\/api$/, '')}/.netlify/functions/getPresentations`;
+      // Add cache-busting timestamp to prevent caching
+      const timestamp = new Date().getTime();
+      const presentationsUrl = `${config.apiUrl.replace(/\/api$/, '')}/.netlify/functions/getPresentations?_=${timestamp}`;
       console.log('Making API request to:', presentationsUrl);
       console.log(`Using token: ${token.substring(0, 10)}...`);
       
@@ -95,6 +97,9 @@ export const addPresentationAsync = createAsyncThunk(
     const allPresentations = getState().presentations.presentations;
     await dispatch(savePresentationsToDatabase(allPresentations));
     
+    // Fetch presentations from the backend to ensure UI is refreshed with latest data
+    await dispatch(fetchPresentations());
+    
     return presentation;
   }
 );
@@ -109,6 +114,9 @@ export const updatePresentationAsync = createAsyncThunk(
     // Then save all presentations to database
     const allPresentations = getState().presentations.presentations;
     await dispatch(savePresentationsToDatabase(allPresentations));
+    
+    // Fetch presentations from the backend to ensure UI is refreshed with latest data
+    await dispatch(fetchPresentations());
     
     return {id, changes};
   }
@@ -125,6 +133,9 @@ export const deletePresentationAsync = createAsyncThunk(
     const allPresentations = getState().presentations.presentations;
     await dispatch(savePresentationsToDatabase(allPresentations));
     
+    // Fetch presentations from the backend to ensure UI is refreshed with latest data
+    await dispatch(fetchPresentations());
+    
     return id;
   }
 );
@@ -135,70 +146,46 @@ const ensureArray = (data) => {
   return Array.isArray(data) ? data : [];
 };
 
-// Load presentations from localStorage if available
-const loadInitialPresentations = () => {
-  try {
-    if (hasStoredPresentations()) {
-      const presentations = loadPresentations();
-      if (Array.isArray(presentations)) {
-        return presentations;
-      }
-    }
-    return defaultPresentations;
-  } catch (error) {
-    console.error('Error loading initial presentations:', error);
-    return defaultPresentations;
-  }
-};
+// No default presentations - always load from API
+const defaultPresentations = [];
 
-// Default presentations if none are stored
-const defaultPresentations = [
-  {
-    id: 1,
-    title: 'WMS Introduction',
-    url: 'https://wms-presentations.s3.amazonaws.com/wms-introduction.pptx',
-    description: 'An introduction to Warehouse Management Systems and their benefits',
-    isLocal: false
-  },
-  {
-    id: 2,
-    title: 'Inbound Processes',
-    url: 'https://wms-presentations.s3.amazonaws.com/inbound-processes.pptx',
-    description: 'Detailed overview of receiving and putaway processes',
-    isLocal: false
-  }
-];
-
-// Initialize with empty array instead of loading data automatically
+// Initialize with empty array - always load from API
 const initialState = {
   presentations: [],
   status: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
   error: null,
   saveStatus: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
   saveError: null,
-  initialized: false // Track if we've loaded initial data
+  initialized: false, // Track if we've loaded initial data
+  skipSave: false // Flag to control whether changes should be saved to backend
 };
 
 export const presentationsSlice = createSlice({
   name: 'presentations',
   initialState,
   reducers: {
-    // New reducer to initialize data only when explicitly requested
+    // Initialize data by marking as initialized - actual data will come from API
     initializePresentationsData: (state) => {
-      // Only initialize if not already done
+      // Only mark as initialized if we haven't already
       if (!state.initialized) {
-        state.presentations = loadInitialPresentations();
+        // Set skipSave to true to prevent saving back to API
+        state.skipSave = true;
+        
+        // Don't load any data here, just mark as initialized
+        // Data will be loaded from API via fetchPresentations thunk
+        console.log('Presentations initialized - will fetch from API');
+        
         state.initialized = true;
       }
     },
     updatePresentations: (state, action) => {
       state.presentations = action.payload;
-      // Save to localStorage
-      savePresentations(action.payload);
+      // No localStorage saving - data is only stored in Redux state
     },
     addPresentation: (state, action) => {
       state.presentations.push(action.payload);
-      // Save to localStorage
+      
+      // Always save user-initiated changes
       savePresentations(state.presentations);
     },
     updatePresentation: (state, action) => {
@@ -207,38 +194,54 @@ export const presentationsSlice = createSlice({
       if (index !== -1) {
         // Update only the fields provided in the changes object
         state.presentations[index] = { ...state.presentations[index], ...changes };
-        // Save to localStorage
+        
+        // Always save user-initiated changes
         savePresentations(state.presentations);
       }
     },
     deletePresentation: (state, action) => {
       state.presentations = state.presentations.filter(p => p.id !== action.payload);
-      // Save to localStorage
+      
+      // Always save user-initiated changes
       savePresentations(state.presentations);
+    },
+    
+    // Action to set the skipSave flag
+    setSkipSave: (state, action) => {
+      state.skipSave = action.payload;
+      console.log('Setting skipSave to:', action.payload);
     }
   },
   extraReducers: (builder) => {
     builder
       .addCase(fetchPresentations.pending, (state) => {
         state.status = 'loading';
+        // Set skipSave to true before loading data from API
+        state.skipSave = true;
       })
       .addCase(fetchPresentations.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        // Only update presentations if we got data from the API
-        if (Array.isArray(action.payload) && action.payload.length > 0) {
-          state.presentations = action.payload;
-          // Save to localStorage for offline access
-          savePresentations(action.payload);
+        // Always update presentations with whatever the API returned, even if empty
+        state.presentations = Array.isArray(action.payload) ? action.payload : [];
+        // Don't save to localStorage anymore
+        try {
+          // Clear localStorage to ensure we're not using cached data
+          localStorage.removeItem(PRESENTATIONS_KEY);
+        } catch (error) {
+          console.error('Error clearing presentations from localStorage:', error);
         }
+        // Keep skipSave true until explicitly changed
       })
       .addCase(fetchPresentations.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload || action.error.message;
+        // Reset skipSave flag
+        state.skipSave = false;
         
         // Don't show error in console for authentication issues
         if (action.payload === 'No authentication token found' || 
-            action.payload?.includes('401') ||
-            action.error?.message?.includes('401')) {
+            (typeof action.payload === 'string' && action.payload.includes('401')) ||
+            (action.error?.message && typeof action.error.message === 'string' && action.error.message.includes('401'))) {
           console.log('Authentication required for fetching presentations');
         } else {
           console.error('Error fetching presentations:', action.payload || action.error.message);
@@ -265,8 +268,12 @@ export const {
   updatePresentations,
   addPresentation,
   updatePresentation,
-  deletePresentation
+  deletePresentation,
+  setSkipSave
 } = presentationsSlice.actions;
+
+// Explicitly export setSkipSave for components that import it directly
+export const setSkipSaveAction = setSkipSave;
 
 // Ensure data is always an array
 const ensureArrayResult = (data) => {
