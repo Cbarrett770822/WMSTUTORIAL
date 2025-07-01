@@ -14,6 +14,9 @@ const PRESENTATIONS_KEY = 'wms_presentations';
 const NOTES_KEY = 'wms_voice_notes';
 const SETTINGS_KEY = 'wms_settings';
 const USER_SETTINGS_PREFIX = 'wms_user_settings_';
+
+// Explicitly export keys that need to be imported elsewhere
+export { PRESENTATIONS_KEY };
 // Export AUTH_TOKEN_KEY so it can be imported by other modules
 export const AUTH_TOKEN_KEY = 'wms_auth_token'; // Using consistent token key across the application
 const CURRENT_USER_KEY = 'wms_current_user';
@@ -103,10 +106,10 @@ export const saveProcesses = async (processes, saveToDatabase = false) => {
   // Create a safe copy of the processes to avoid mutation issues
   let safeProcesses = [];
   try {
-    if (Array.isArray(processes) && processes.length > 0) {
+    if (Array.isArray(processes)) {
       safeProcesses = JSON.parse(JSON.stringify(processes));
     } else {
-      console.warn('No processes found in the array or processes is not an array');
+      console.warn('Processes is not an array');
     }
   } catch (copyError) {
     console.error('Error creating safe copy of processes:', copyError);
@@ -584,8 +587,8 @@ export const loadSettings = async (isUserSpecific = true) => {
     if (token) {
       try {
         const endpoint = isUserSpecific ? 
-          `${config.apiUrl}/getUserSettings?userId=${userId}` : 
-          `${config.apiUrl}/getSettings`;
+          `${config.apiUrl}/.netlify/functions/getUserSettings?userId=${userId}` : 
+          `${config.apiUrl}/.netlify/functions/getSettings`;
         
         console.log(`Fetching settings from endpoint: ${endpoint}`);
         
