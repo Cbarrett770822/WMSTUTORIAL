@@ -1,10 +1,14 @@
 [build]
   # Build command for the frontend and install dependencies for functions
-  command = "npm install && cd backend/netlify/functions && npm install && cd ../../../frontend && npm install && node netlify-build.js"
+  command = "npm install && cd backend/netlify/functions && npm install && cp ../../../backend/.env.production ./.env && cd ../../../frontend && npm install && node netlify-build.js"
   # Directory with the built frontend assets
   publish = "frontend/build"
   # Directory with serverless functions
   functions = "backend/netlify/functions"
+
+[build.environment]
+  # Set MongoDB connection string for serverless functions
+  MONGODB_URI = "mongodb+srv://charlesbtt7722:8LwMaauBS4Opqody@cluster0.eslgbjq.mongodb.net/test?retryWrites=true&w=majority"
 
 [dev]
   command = "npm run start"

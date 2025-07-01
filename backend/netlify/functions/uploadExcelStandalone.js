@@ -9,7 +9,8 @@ const Process = mongoose.models.Process || mongoose.model('Process', require('./
 const Presentation = mongoose.models.Presentation || mongoose.model('Presentation', require('./models/Presentation').schema);
 
 // MongoDB connection string from environment variables
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://user:password@cluster.mongodb.net/wms-tutorial?retryWrites=true&w=majority';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://charlesbtt7722:8LwMaauBS4Opqody@cluster0.eslgbjq.mongodb.net/test?retryWrites=true&w=majority';
+console.log('MongoDB URI configured:', MONGODB_URI ? 'URI exists (not showing for security)' : 'URI is missing');
 
 /**
  * Generate a consistent ID for processes
@@ -355,17 +356,32 @@ const connectToDatabase = async () => {
       return mongoose.connection;
     }
     
+    if (!MONGODB_URI) {
+      throw new Error('MongoDB URI is not configured. Please check environment variables.');
+    }
+    
     console.log('Connecting to MongoDB...');
-    await mongoose.connect(MONGODB_URI, {
+    console.log('Connection options:', {
       useNewUrlParser: true,
-      useUnifiedTopology: true
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000 // 5 seconds timeout
     });
     
-    console.log('Connected to MongoDB');
+    await mongoose.connect(MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000 // 5 seconds timeout
+    });
+    
+    console.log('Connected to MongoDB successfully');
     return mongoose.connection;
   } catch (error) {
-    console.error('Error connecting to MongoDB:', error);
-    throw error;
+    console.error('Error connecting to MongoDB:', error.message);
+    console.error('Error details:', error);
+    if (error.name === 'MongooseServerSelectionError') {
+      console.error('Server selection error - check if MongoDB Atlas IP whitelist includes Netlify IPs');
+    }
+    throw new Error(`MongoDB connection failed: ${error.message}`);
   }
 };
 
