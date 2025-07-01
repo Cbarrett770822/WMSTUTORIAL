@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { AUTH_TOKEN_KEY } from '../../services/storageService';
 import { 
   Box, 
   Typography, 
@@ -29,8 +30,8 @@ const ProcessListPage = () => {
     const fetchProcessesDirectly = async () => {
       setIsLoading(true);
       try {
-        // Get token from localStorage
-        const token = localStorage.getItem('wms_auth_token');
+        // Get token from localStorage using the constant
+        const token = localStorage.getItem(AUTH_TOKEN_KEY);
         if (!token) {
           throw new Error('Authentication token not found');
         }
