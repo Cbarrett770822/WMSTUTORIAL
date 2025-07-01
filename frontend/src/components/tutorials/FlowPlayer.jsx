@@ -118,81 +118,63 @@ const FlowPlayer = () => {
     if (!url) return null;
     
     try {
-      // Handle different YouTube URL formats
-      let videoId = null;
+      console.log('Extracting YouTube ID from URL:', url);
       
-      console.log('Attempting to extract YouTube ID from URL:', url);
+      // Simple approach - try several regex patterns to match different YouTube URL formats
+      const patterns = [
+        // Standard watch URLs: youtube.com/watch?v=ID
+        /(?:youtube\.com\/watch\?(?:.*&)?v=|youtu\.be\/)([^&#?/]+)/,
+        
+        // Embed URLs: youtube.com/embed/ID
+        /youtube\.com\/embed\/([^/?&]+)/,
+        
+        // Short URLs: youtu.be/ID
+        /youtu\.be\/([^/?&]+)/,
+        
+        // Live URLs: youtube.com/live/ID
+        /youtube\.com\/live\/([^/?&]+)/
+      ];
       
-      // Try to parse the URL first
+      // Try each pattern
+      for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match && match[1]) {
+          const videoId = match[1];
+          console.log('Extracted YouTube ID:', videoId, 'using pattern:', pattern);
+          return videoId;
+        }
+      }
+      
+      // If all regex patterns fail, try URL parsing as a fallback
       try {
         const urlObj = new URL(url);
         
-        // Format: https://www.youtube.com/watch?v=VIDEO_ID
+        // Format: youtube.com/watch?v=ID
         if (urlObj.hostname.includes('youtube.com') && urlObj.pathname.includes('/watch')) {
-          videoId = urlObj.searchParams.get('v');
-          console.log('Extracted YouTube ID from watch URL:', videoId);
-        }
-        // Format: https://www.youtube.com/live/VIDEO_ID
-        else if (urlObj.hostname.includes('youtube.com') && urlObj.pathname.includes('/live/')) {
-          // Extract the ID from the pathname
-          const pathParts = urlObj.pathname.split('/');
-          // The ID should be right after 'live' in the path
-          const liveIndex = pathParts.indexOf('live');
-          if (liveIndex !== -1 && liveIndex < pathParts.length - 1) {
-            videoId = pathParts[liveIndex + 1];
-            console.log('Extracted YouTube live video ID from pathname:', videoId);
+          const videoId = urlObj.searchParams.get('v');
+          if (videoId) {
+            console.log('Extracted YouTube ID from URL params:', videoId);
+            return videoId;
           }
         }
-        // Format: https://www.youtube.com/embed/VIDEO_ID
-        else if (urlObj.hostname.includes('youtube.com') && urlObj.pathname.includes('/embed/')) {
+        
+        // Format: youtube.com/something/ID
+        // This is a last resort for any YouTube URL format
+        if (urlObj.hostname.includes('youtube.com') || urlObj.hostname === 'youtu.be') {
           const pathParts = urlObj.pathname.split('/');
-          const embedIndex = pathParts.indexOf('embed');
-          if (embedIndex !== -1 && embedIndex < pathParts.length - 1) {
-            videoId = pathParts[embedIndex + 1];
-            console.log('Extracted YouTube embed video ID from pathname:', videoId);
+          // Get the last non-empty path segment
+          const lastPart = pathParts.filter(part => part).pop();
+          if (lastPart && lastPart.length > 5) { // YouTube IDs are typically 11 chars
+            console.log('Last resort extraction - path segment:', lastPart);
+            return lastPart;
           }
-        }
-        // Format: https://youtu.be/VIDEO_ID
-        else if (urlObj.hostname === 'youtu.be') {
-          // The ID is the pathname without the leading slash
-          videoId = urlObj.pathname.substring(1).split('/')[0].split('?')[0];
-          console.log('Extracted YouTube short URL video ID:', videoId);
         }
       } catch (urlError) {
-        console.warn('URL parsing failed, falling back to regex:', urlError);
+        console.warn('URL parsing fallback failed:', urlError);
       }
       
-      // If URL parsing failed or didn't extract an ID, try regex fallbacks
-      if (!videoId) {
-        // Format: youtube.com/watch?v=ID
-        let match = url.match(/youtube\.com\/watch\?(?:.*&)?v=([^&]+)/);
-        if (match && match[1]) {
-          videoId = match[1];
-          console.log('Regex fallback - YouTube watch ID:', videoId);
-        }
-        // Format: youtu.be/ID
-        else if ((match = url.match(/youtu\.be\/([^\/?&]+)/))) {
-          videoId = match[1];
-          console.log('Regex fallback - YouTube short URL ID:', videoId);
-        }
-        // Format: youtube.com/embed/ID
-        else if ((match = url.match(/\/embed\/([^\/?&]+)/))) {
-          videoId = match[1];
-          console.log('Regex fallback - YouTube embed ID:', videoId);
-        }
-        // Format: youtube.com/live/ID
-        else if ((match = url.match(/youtube\.com\/live\/([^\/?&]+)/))) {
-          videoId = match[1];
-          console.log('Regex fallback - YouTube live ID:', videoId);
-        }
-      }
-      
-      // Final validation - YouTube IDs are typically 11 characters
-      if (videoId && (videoId.length < 5 || videoId.length > 20)) {
-        console.warn('Extracted YouTube ID has unusual length:', videoId.length);
-      }
-      
-      return videoId;
+      console.warn('Could not extract YouTube ID from URL:', url);
+      return null;
     } catch (error) {
       console.error('Error extracting YouTube video ID:', error);
       return null;
@@ -248,11 +230,14 @@ const FlowPlayer = () => {
             setIsYouTube(true);
             setVideoUrl(sanitizeUrl(rawUrl));
             
-            // Extract YouTube video ID
+            // Extract YouTube video ID using our improved extraction function
             const youtubeId = extractYoutubeId(rawUrl);
+            
             if (youtubeId) {
-              setYoutubeEmbedUrl(`https://www.youtube.com/embed/${youtubeId}?autoplay=0&rel=0&showinfo=1&modestbranding=1&origin=${encodeURIComponent(window.location.origin)}`);
-              console.log('Created YouTube embed URL:', `https://www.youtube.com/embed/${youtubeId}`);
+              // Create standard YouTube embed URL with the extracted ID
+              const embedUrl = `https://www.youtube.com/embed/${youtubeId}?autoplay=0&rel=0&showinfo=1&modestbranding=1&origin=${encodeURIComponent(window.location.origin)}`;
+              setYoutubeEmbedUrl(embedUrl);
+              console.log('Created YouTube embed URL:', embedUrl);
             } else {
               console.error('Could not extract YouTube video ID from URL:', rawUrl);
               setVideoError(true);
