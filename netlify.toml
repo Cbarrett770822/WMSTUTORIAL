@@ -19,11 +19,7 @@
   to = "/.netlify/functions/:splat"
   status = 200
   force = true
-  [redirects.headers]
-    Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
-    Access-Control-Allow-Headers = "Content-Type, Authorization"
-    Access-Control-Max-Age = "86400"
+  headers = {Access-Control-Allow-Origin = "*", Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS", Access-Control-Allow-Headers = "Content-Type, Authorization", Access-Control-Max-Age = "86400"}
 
 # Note: Direct access to functions is handled automatically by Netlify
 # We don't need to specify a redirect for /.netlify/functions/*
