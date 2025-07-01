@@ -8,16 +8,22 @@
 const mongoose = require('mongoose');
 
 // MongoDB Atlas connection URI - always use Atlas in production
-let MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://charlesbtt7722:8LwMaauBS4Opqody@cluster0.eslgbjq.mongodb.net/wms-tutorial?retryWrites=true&w=majority';
+const MONGODB_ATLAS_URI = 'mongodb+srv://charlesbtt7722:8LwMaauBS4Opqody@cluster0.eslgbjq.mongodb.net/wms-tutorial?retryWrites=true&w=majority';
 
-// Ensure we never try to connect to localhost in production
-if (MONGODB_URI.includes('localhost') || MONGODB_URI.includes('127.0.0.1')) {
-  console.warn('Warning: Attempting to use localhost MongoDB in production environment');
-  // Force use of MongoDB Atlas in production
-  if (process.env.NODE_ENV === 'production') {
-    console.log('Forcing MongoDB Atlas connection in production');
-    MONGODB_URI = 'mongodb+srv://charlesbtt7722:8LwMaauBS4Opqody@cluster0.eslgbjq.mongodb.net/wms-tutorial?retryWrites=true&w=majority';
-  }
+// Always use MongoDB Atlas in Netlify environment
+let MONGODB_URI;
+
+// Check if we're in a Netlify environment
+const isNetlify = process.env.NETLIFY === 'true' || process.env.CONTEXT === 'production' || process.env.CONTEXT === 'deploy-preview' || process.env.CONTEXT === 'branch-deploy';
+
+// Force MongoDB Atlas in production or Netlify environments
+if (process.env.NODE_ENV === 'production' || isNetlify) {
+  console.log('Using MongoDB Atlas in production/Netlify environment');
+  MONGODB_URI = MONGODB_ATLAS_URI;
+} else {
+  // In development, use the environment variable or fallback to Atlas
+  MONGODB_URI = process.env.MONGODB_URI || MONGODB_ATLAS_URI;
+  console.log(`Using ${MONGODB_URI.includes('mongodb+srv') ? 'MongoDB Atlas' : 'local MongoDB'} in development`);
 }
 
 // Track connection status to avoid multiple connections
@@ -31,6 +37,9 @@ let mongooseInstance = mongoose;
  * @returns {Promise<mongoose.Connection>} - Mongoose connection
  */
 const connectToDatabase = async () => {
+  // Log connection attempt
+  console.log(`Connecting to MongoDB: ${MONGODB_URI.substring(0, 20)}... (readyState: ${mongoose.connection.readyState})`);
+  
   // Check connection state
   if (isConnected && mongoose.connection.readyState === 1) {
     console.log('Using existing database connection');
@@ -102,13 +111,20 @@ const connectToDatabase = async () => {
  * @param {Function} handler - The handler function to wrap
  * @returns {Function} - Wrapped handler function with database connection
  */
-const withDatabase = (handler) => {
+const withDatabase = (handler, options = {}) => {
   return async (event, context, authContext = {}) => {
     // Make context callbackWaitsForEmptyEventLoop = false to reuse connection
     context.callbackWaitsForEmptyEventLoop = false;
     
     let connection;
     try {
+      // Force new connection if requested
+      if (options.forceNewConnection && isConnected) {
+        console.log('Forcing new database connection');
+        await mongoose.connection.close();
+        isConnected = false;
+      }
+      
       // Connect to database and ensure it's ready
       connection = await connectToDatabase();
       
@@ -121,7 +137,8 @@ const withDatabase = (handler) => {
       const dbContext = {
         ...authContext,
         db: connection,
-        mongoose
+        mongoose,
+        client: mongoose.connection.getClient() // Add direct access to MongoDB client
       };
       
       // Call the handler with database context
@@ -135,7 +152,18 @@ const withDatabase = (handler) => {
         ? 'Database connection error'
         : 'Database operation error';
       
+      // Log connection details on error
+      console.error('Database error details:', {
+        readyState: mongoose.connection.readyState,
+        connectionString: MONGODB_URI.substring(0, 20) + '...',
+        environment: process.env.NODE_ENV || 'not set',
+        netlifyContext: process.env.CONTEXT || 'not set'
+      });
+      
       // Return error response with more details in development
+      // Try to reconnect on next request
+      isConnected = false;
+      
       return {
         statusCode: 500,
         headers: authContext.headers || {

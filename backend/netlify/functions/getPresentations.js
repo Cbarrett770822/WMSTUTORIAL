@@ -11,8 +11,12 @@ const withDatabase = require('./middleware/withDatabase');
 const withCors = require('./middleware/withCors');
 const Presentation = require('./models/Presentation');
 
-// Environment variables
-const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+// For simplified authentication
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+// Ensure we're using the correct MongoDB connection string
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://user:password@cluster.mongodb.net/wms-tutorial?retryWrites=true&w=majority';
+console.log('Using MongoDB URI:', MONGODB_URI.substring(0, 20) + '...');
 
 /**
  * Core handler function for retrieving presentations
@@ -41,8 +45,10 @@ const getPresentationsHandler = async (event, context, { userId, username, role,
     const requestedUserId = queryParams.userId;
     diagnostics.requestedUserId = requestedUserId || 'none';
     
-    // Log authentication information
+    // Log authentication information and environment
     console.log('Authentication info:', { userId, username, role });
+    console.log('Environment:', process.env.NODE_ENV || 'not set');
+    console.log('Netlify context:', process.env.CONTEXT || 'not set');
     
     // Prepare query based on user context
     let query = {};
@@ -67,6 +73,8 @@ const getPresentationsHandler = async (event, context, { userId, username, role,
     // Check if the Presentation model is properly defined
     console.log('Presentation model exists:', !!Presentation);
     console.log('Presentation collection name:', Presentation.collection.name);
+    console.log('Mongoose connection state:', mongoose.connection.readyState);
+    console.log('Mongoose connection host:', mongoose.connection.host);
     
     // First count documents to verify data exists
     const count = await Presentation.countDocuments({});
@@ -84,7 +92,8 @@ const getPresentationsHandler = async (event, context, { userId, username, role,
     }
     
     // Get presentations with query - don't use lean() to keep model methods
-    let presentations = await Presentation.find(query);
+    // Add a timeout to ensure the query doesn't hang indefinitely
+    let presentations = await Presentation.find(query).maxTimeMS(5000);
     console.log('Presentations found with query:', presentations.length);
     if (presentations.length > 0) {
       console.log('First presentation sample:', JSON.stringify(presentations[0].toObject()));
@@ -173,15 +182,10 @@ const getPresentationsHandler = async (event, context, { userId, username, role,
 // withAuth middleware handles authentication but allows unauthenticated requests
 // withDatabase middleware handles the MongoDB connection
 // withCors middleware handles CORS headers and preflight requests
+// Make sure withCors is the outermost middleware to handle CORS properly
 exports.handler = withCors(
   withAuth(
-    withDatabase(getPresentationsHandler),
+    withDatabase(getPresentationsHandler, { forceNewConnection: false }), // Use existing connection if available
     { requireAuth: false } // Allow unauthenticated requests for read-only operation
-  ),
-  { 
-    methods: ['GET'],
-    headers: {
-      'Cache-Control': 'max-age=300' // Cache for 5 minutes
-    }
-  }
+  )
 );
