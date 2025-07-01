@@ -1,6 +1,6 @@
 [build]
   # Build command for the frontend and install dependencies for functions
-  command = "npm install && cd backend/netlify/functions && npm install && cp ../../../backend/.env.production ./.env && cd ../../../frontend && npm install && node netlify-build.js"
+  command = "npm install && cd backend/netlify/functions && npm install && node setup-env.js && cd ../../../frontend && npm install && node netlify-build.js"
   # Directory with the built frontend assets
   publish = "frontend/build"
   # Directory with serverless functions
