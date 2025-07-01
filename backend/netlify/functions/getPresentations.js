@@ -72,6 +72,17 @@ const getPresentationsHandler = async (event, context, { userId, username, role,
     const count = await Presentation.countDocuments({});
     console.log('Total presentations in database (all):', count);
     
+    // Log the collection name and check if it exists
+    const collections = await mongoose.connection.db.listCollections().toArray();
+    console.log('Available collections:', collections.map(c => c.name));
+    
+    // Try to find presentations without any query first to see if data exists
+    const allPresentations = await Presentation.find({}).lean();
+    console.log('All presentations (no query):', allPresentations.length);
+    if (allPresentations.length > 0) {
+      console.log('Sample presentation fields:', Object.keys(allPresentations[0]));
+    }
+    
     // Get presentations with query - don't use lean() to keep model methods
     let presentations = await Presentation.find(query);
     console.log('Presentations found with query:', presentations.length);
