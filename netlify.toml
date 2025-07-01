@@ -1,6 +1,6 @@
 [build]
-  # Build command for the frontend
-  command = "cd frontend && npm install && npm run build"
+  # Build command for the frontend using custom script to handle deprecated packages
+  command = "cd frontend && npm install && node netlify-build.js"
   # Directory with the built frontend assets
   publish = "frontend/build"
   # Directory with serverless functions

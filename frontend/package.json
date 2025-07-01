@@ -16,6 +16,7 @@
     "bcryptjs": "^3.0.2",
     "bootstrap": "^5.3.6",
     "dotenv": "^16.5.0",
+    "file-saver": "^2.0.5",
     "react": "^19.1.0",
     "react-bootstrap": "^2.10.10",
     "react-dom": "^19.1.0",
@@ -24,11 +25,12 @@
     "react-router-dom": "^7.6.0",
     "react-scripts": "5.0.1",
     "redux": "^5.0.1",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "DISABLE_ESLINT_PLUGIN=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -52,6 +54,13 @@
     ]
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "svgo": "^2.8.0"
+  },
+  "resolutions": {
+    "svgo": "^2.8.0",
+    "glob": "^8.1.0",
+    "workbox-cacheable-response": "^7.0.0",
+    "eslint": "^8.57.0"
   }
 }
