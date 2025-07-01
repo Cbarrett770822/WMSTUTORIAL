@@ -41,6 +41,9 @@ const getPresentationsHandler = async (event, context, { userId, username, role,
     const requestedUserId = queryParams.userId;
     diagnostics.requestedUserId = requestedUserId || 'none';
     
+    // Log authentication information
+    console.log('Authentication info:', { userId, username, role });
+    
     // Prepare query based on user context
     let query = {};
     
@@ -53,15 +56,28 @@ const getPresentationsHandler = async (event, context, { userId, username, role,
       diagnostics.filterType = 'authenticated_user';
       query = { $or: [{ userId: userId }, { userId: { $exists: false } }] };
     } else {
-      // If not authenticated, only show presentations without a userId (global)
-      diagnostics.filterType = 'public_only';
-      query = { userId: { $exists: false } };
+      // If not authenticated, show all presentations (changed to match user requirements)
+      diagnostics.filterType = 'all_presentations';
+      query = {}; // Empty query to return all presentations
     }
     
     diagnostics.query = query;
+    console.log('MongoDB query:', JSON.stringify(query));
     
-    // Get presentations with query
-    let presentations = await Presentation.find(query).lean();
+    // Check if the Presentation model is properly defined
+    console.log('Presentation model exists:', !!Presentation);
+    console.log('Presentation collection name:', Presentation.collection.name);
+    
+    // First count documents to verify data exists
+    const count = await Presentation.countDocuments({});
+    console.log('Total presentations in database (all):', count);
+    
+    // Get presentations with query - don't use lean() to keep model methods
+    let presentations = await Presentation.find(query);
+    console.log('Presentations found with query:', presentations.length);
+    if (presentations.length > 0) {
+      console.log('First presentation sample:', JSON.stringify(presentations[0].toObject()));
+    }
     diagnostics.presentationsFound = presentations.length;
     
     // If no presentations are found, return an empty array
@@ -83,13 +99,13 @@ const getPresentationsHandler = async (event, context, { userId, username, role,
     
     // Process presentations to add direct URLs and viewer URLs
     const processedPresentations = presentations.map(presentation => {
-      // Create a temporary model instance to use the methods
-      const tempModel = new Presentation(presentation);
+      // Convert Mongoose document to plain object and add URLs
+      const presentationObj = presentation.toObject();
       
       return {
-        ...presentation,
-        directUrl: tempModel.getDirectUrl ? tempModel.getDirectUrl() : presentation.url,
-        viewerUrl: tempModel.getViewerUrl ? tempModel.getViewerUrl() : presentation.url
+        ...presentationObj,
+        directUrl: presentation.getDirectUrl(),
+        viewerUrl: presentation.getViewerUrl()
       };
     });
     
