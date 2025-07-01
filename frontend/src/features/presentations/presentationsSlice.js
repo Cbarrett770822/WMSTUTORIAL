@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { AUTH_TOKEN_KEY } from '../../services/storageService';
+import { AUTH_TOKEN_KEY, PRESENTATIONS_KEY, savePresentations } from '../../services/storageService';
 import { savePresentationsToApi } from '../../services/apiService';
 import config from '../../config';
 
