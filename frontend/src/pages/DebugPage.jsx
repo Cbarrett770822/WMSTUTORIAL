@@ -31,6 +31,9 @@ const DebugPage = () => {
                 <Nav.Item>
                   <Nav.Link eventKey="mongodb">MongoDB</Nav.Link>
                 </Nav.Item>
+                <Nav.Item>
+                  <Nav.Link href="/process-list" className="external-link">Process List Page</Nav.Link>
+                </Nav.Item>
               </Nav>
             </Card>
           </Col>

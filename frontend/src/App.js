@@ -27,7 +27,9 @@ import AdminToolsPage from './pages/AdminToolsPage';
 import ApiDiagnostics from './components/diagnostics/ApiDiagnostics';
 import AuthDebugger from './components/debug/AuthDebugger';
 import ProcessApiDebugger from './components/debug/ProcessApiDebugger';
+import ProcessListPage from './components/debug/ProcessListPage';
 import PresentationsApiDebugger from './components/debug/PresentationsApiDebugger';
+import PresentationDebugger from './components/debug/PresentationDebugger';
 import RoleDebugger from './components/debug/RoleDebugger';
 import DebugPage from './pages/DebugPage';
 import ProtectedRoute, { AdminRoute, SupervisorRoute } from './components/layout/ProtectedRoute';
@@ -249,6 +251,20 @@ function AppContent() {
           <Layout onLogout={handleLogout}>
             <RoleDebugger />
           </Layout>
+        } />
+        
+        <Route path="/debug/presentations" element={
+          <Layout onLogout={handleLogout}>
+            <PresentationDebugger />
+          </Layout>
+        } />
+        
+        <Route path="/process-list" element={
+          <AdminRoute>
+            <Layout onLogout={handleLogout}>
+              <ProcessListPage />
+            </Layout>
+          </AdminRoute>
         } />
         
         {/* Catch all route */}

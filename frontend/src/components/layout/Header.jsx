@@ -266,6 +266,17 @@ const Header = ({ onLogout }) => {
                     <BuildIcon fontSize="small" />
                   </ListItemIcon>
                   <ListItemText>API Diagnostics</ListItemText>
+                </MenuItem>,
+                <MenuItem 
+                  key="process-list"
+                  component={RouterLink} 
+                  to="/process-list"
+                  onClick={handleCloseUserMenu}
+                >
+                  <ListItemIcon>
+                    <AccountTreeIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>Process List</ListItemText>
                 </MenuItem>
               ]}
               <Divider />
