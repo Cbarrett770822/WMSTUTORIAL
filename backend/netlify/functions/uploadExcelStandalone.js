@@ -9,7 +9,7 @@ const Process = mongoose.models.Process || mongoose.model('Process', require('./
 const Presentation = mongoose.models.Presentation || mongoose.model('Presentation', require('./models/Presentation').schema);
 
 // MongoDB connection string from environment variables
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://charlesbtt7722:8LwMaauBS4Opqody@cluster0.eslgbjq.mongodb.net/test?retryWrites=true&w=majority';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://charlesbtt7722:8LwMaauBS4Opqody@cluster0.eslgbjq.mongodb.net/wms-tutorial?retryWrites=true&w=majority';
 console.log('MongoDB URI configured:', MONGODB_URI ? 'URI exists (not showing for security)' : 'URI is missing');
 
 /**

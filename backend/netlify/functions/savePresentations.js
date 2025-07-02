@@ -1,6 +1,8 @@
-const { connectToDatabase } = require('./utils/mongodb');
-const Presentation = require('./models/Presentation');
+const withCors = require('./middleware/withCors');
+const withAuth = require('./middleware/withAuth');
+const withDatabase = require('./middleware/withDatabase');
 const mongoose = require('mongoose');
+const { ObjectId } = require('mongodb');
 
 // For simplified authentication
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -23,120 +25,184 @@ const isTransientTransactionError = (error) => {
   return false;
 };
 
-// Function to save presentations with retry logic for transient errors
-async function savePresentationsWithRetry(presentations, userId, maxRetries = 3) {
-  let lastError = null;
-  let updateResults = [];
+// Helper function to detect source type from URL
+function detectSourceType(url) {
+  if (!url) return 'other';
   
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      // Start a new session for each attempt
-      const session = await mongoose.startSession();
+  const lowerUrl = url.toLowerCase();
+  if (lowerUrl.includes('s3.amazonaws.com')) return 's3';
+  if (lowerUrl.includes('dropbox.com')) return 'dropbox';
+  if (lowerUrl.includes('drive.google.com')) return 'gdrive';
+  if (lowerUrl.includes('docs.google.com/presentation')) return 'gslides';
+  if (lowerUrl.includes('onedrive.live.com') || lowerUrl.includes('sharepoint.com')) return 'onedrive';
+  return 'other';
+}
+
+// Helper function to generate direct URL based on source type
+function generateDirectUrl(url, sourceType) {
+  if (!url) return url;
+  
+  let directUrl = url;
+  
+  switch (sourceType) {
+    case 'dropbox':
+      // Convert dropbox.com/s/ links to dropbox.com/s/dl/ links
+      directUrl = directUrl.replace('www.dropbox.com/s/', 'www.dropbox.com/s/dl/');
+      // Remove query parameters
+      directUrl = directUrl.split('?')[0];
+      break;
       
-      try {
+    case 'gdrive':
+      // Extract file ID and create direct download link
+      const fileIdMatch = directUrl.match(/\/file\/d\/([^\/]+)/);
+      if (fileIdMatch && fileIdMatch[1]) {
+        const fileId = fileIdMatch[1];
+        directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+      }
+      break;
+      
+    case 'gslides':
+      // Extract presentation ID and create export link
+      const presentationIdMatch = directUrl.match(/\/presentation\/d\/([^\/]+)/);
+      if (presentationIdMatch && presentationIdMatch[1]) {
+        const presentationId = presentationIdMatch[1];
+        directUrl = `https://docs.google.com/presentation/d/${presentationId}/export/pptx`;
+      }
+      break;
+  }
+  
+  return directUrl;
+}
+
+// Function to save presentations with retry logic for transient errors
+async function savePresentationsWithRetry(presentations, dbContext) {
+  const maxRetries = 3;
+  let lastError = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    let session = null;
+    let useTransaction = false;
+    
+    // Check if we can use transactions (MongoDB 4.0+)
+    try {
+      if (dbContext.client && typeof dbContext.client.startSession === 'function') {
+        session = dbContext.client.startSession();
         session.startTransaction();
-        
-        updateResults = [];
-        
-        // Process each presentation
-        for (const presentation of presentations) {
-          // Ensure the presentation has a userId (use the provided userId if not specified)
-          if (!presentation.userId) {
-            presentation.userId = userId;
-          }
-          
-          // Check if this presentation already exists (by id)
-          if (presentation.id) {
-            // Use lean() to avoid potential read conflicts
-            const existingPresentation = await Presentation.findOne(
-              { id: presentation.id },
-              null,
-              { session }
-            ).lean();
-            
-            let updateResult;
-            if (existingPresentation) {
-              // For existing presentations, use findOneAndUpdate without the _id field
-              // to avoid MongoDB duplicate key errors
-              const { _id, ...presentationWithoutId } = presentation;
-              
-              updateResult = await Presentation.findOneAndUpdate(
-                { _id: existingPresentation._id },
-                presentationWithoutId,
-                { new: true, session }
-              );
-              console.log(`Updated existing presentation with id: ${presentation.id}`);
-            } else {
-              // Create new presentation with the provided id
-              // Make sure we don't include any _id field that might have been sent
-              const { _id, ...presentationWithoutId } = presentation;
-              const newPresentation = new Presentation(presentationWithoutId);
-              updateResult = await newPresentation.save({ session });
-              console.log(`Created new presentation with id: ${presentation.id}`);
-            }
-            updateResults.push(updateResult);
-            console.log(`Updated/inserted presentation with id: ${presentation.id}`);
+        useTransaction = true;
+        console.log(`Transaction attempt ${attempt + 1} started`);
+      } else {
+        console.log(`Simple update attempt ${attempt + 1} started (transactions not available)`);
+      }
+      
+      const updateResults = [];
+      
+      for (const presentation of presentations) {
+        // Ensure the presentation has a url field (required by schema)
+        if (!presentation.url) {
+          if (presentation.localUrl) {
+            presentation.url = presentation.localUrl;
+          } else if (presentation.remoteUrl) {
+            presentation.url = presentation.remoteUrl;
           } else {
-            // If no id is provided, generate one before creating
-            const presentationWithId = {
-              ...presentation,
-              id: String(Date.now()) // Generate a string ID using current timestamp
-            };
-            const newPresentation = new Presentation(presentationWithId);
-            await newPresentation.save({ session });
-            updateResults.push(newPresentation);
-            console.log('Created new presentation with generated id:', presentationWithId.id);
+            // If neither localUrl nor remoteUrl is available, use a placeholder
+            presentation.url = '/placeholder-url';
           }
         }
         
-        console.log(`Updated/inserted ${updateResults.length} presentations`);
+        // Detect source type from URL
+        const sourceType = detectSourceType(presentation.url);
+        presentation.sourceType = sourceType;
         
-        // Commit the transaction
+        // Set isLocal flag based on sourceType
+        presentation.isLocal = sourceType === 'local';
+        
+        // Generate and add directUrl based on source type
+        const directUrl = generateDirectUrl(presentation.url, sourceType);
+        presentation.directUrl = directUrl;
+        
+        // Generate and add viewerUrl
+        if (!presentation.isLocal && directUrl) {
+          const encodedUrl = encodeURIComponent(directUrl);
+          presentation.viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
+        }
+        
+        // Create a clean copy without _id to avoid conflicts
+        const { _id, ...cleanPresentation } = presentation;
+        
+        // If presentation has an id, use upsert to update or create
+        if (cleanPresentation.id) {
+          // Use updateOne with upsert:true to handle both update and insert cases
+          const updateResult = await dbContext.db.collection('presentations').updateOne(
+            { id: cleanPresentation.id },
+            { $set: cleanPresentation },
+            { upsert: true }
+          );
+          
+          if (updateResult.matchedCount > 0) {
+            console.log(`Updated existing presentation with id: ${cleanPresentation.id}`);
+          } else {
+            console.log(`Created new presentation with id: ${cleanPresentation.id}`);
+          }
+          
+          updateResults.push(cleanPresentation);
+        } else {
+          // If no id is provided, generate one before creating
+          const presentationWithId = {
+            ...cleanPresentation,
+            id: String(Date.now()) // Generate a string ID using current timestamp
+          };
+          
+          // Use updateOne with upsert instead of insertOne to avoid _id conflicts
+          const updateResult = await dbContext.db.collection('presentations').updateOne(
+            { id: presentationWithId.id },
+            { $set: presentationWithId },
+            { upsert: true }
+          );
+          
+          updateResults.push(presentationWithId);
+          console.log('Created new presentation with generated id:', presentationWithId.id);
+        }
+      }
+      
+      console.log(`Updated/inserted ${updateResults.length} presentations`);
+      
+      // Commit the transaction if we're using one
+      if (useTransaction && session) {
         await session.commitTransaction();
         console.log('Transaction committed successfully');
         
-        // If we get here, the transaction was successful
+        // End the session
         session.endSession();
-        return updateResults;
-      } catch (transactionError) {
+      }
+      
+      return updateResults;
+    } catch (error) {
+      // Handle transaction errors if we're using transactions
+      if (useTransaction && session) {
         // Check if the session is still in a transaction before trying to abort
-        if (session.inTransaction()) {
-          try {
+        try {
+          if (session.inTransaction()) {
             await session.abortTransaction();
             console.log('Transaction aborted due to error');
-          } catch (abortError) {
-            console.error('Error aborting transaction:', abortError);
           }
+          // End the session regardless of abort success
+          session.endSession();
+        } catch (abortError) {
+          console.error('Error handling transaction cleanup:', abortError);
         }
-        
-        // End the session regardless of abort success
-        session.endSession();
-        
-        // If this is a transient error and we have retries left, we'll retry
-        if (isTransientTransactionError(transactionError) && attempt < maxRetries) {
-          lastError = transactionError;
-          const delay = Math.pow(2, attempt) * 500; // Exponential backoff
-          console.log(`Transient transaction error detected, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          continue; // Try again
-        }
-        
-        // If it's not a transient error or we're out of retries, rethrow
-        throw transactionError;
       }
-    } catch (error) {
-      lastError = error;
       
       // If this is a transient error and we have retries left, we'll retry
       if (isTransientTransactionError(error) && attempt < maxRetries) {
+        lastError = error;
         const delay = Math.pow(2, attempt) * 500; // Exponential backoff
-        console.log(`Transient error detected, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        console.log(`Transient transaction error detected, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue; // Try again
       }
       
       // If it's not a transient error or we're out of retries, rethrow
-      throw lastError;
+      throw error;
     }
   }
   
@@ -144,7 +210,8 @@ async function savePresentationsWithRetry(presentations, userId, maxRetries = 3)
   throw lastError || new Error('Failed to save presentations after multiple attempts');
 }
 
-exports.handler = async (event, context) => {
+// Handler for saving presentations
+const handler = async (event, context, dbContext) => {
   // Set CORS headers for browser clients
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -172,7 +239,6 @@ exports.handler = async (event, context) => {
     };
   }
 
-  context.callbackWaitsForEmptyEventLoop = false;
   let userId = null;
   let userRole = null;
 
@@ -211,9 +277,6 @@ exports.handler = async (event, context) => {
       userId = 'dev-fallback-user';
       userRole = 'admin';
     }
-
-    // Connect to the database
-    await connectToDatabase();
     
     // Parse the request body
     let presentations;
@@ -270,7 +333,7 @@ exports.handler = async (event, context) => {
       }));
       
       // Use our retry function to handle transient MongoDB errors
-      const updateResults = await savePresentationsWithRetry(enhancedPresentations, metadataUserId);
+      const updateResults = await savePresentationsWithRetry(enhancedPresentations, dbContext);
       console.log(`Successfully saved ${updateResults.length} presentations with retry mechanism`);
       
       // Return success response
@@ -335,3 +398,7 @@ exports.handler = async (event, context) => {
     }
   }
 };
+
+// Apply middleware and export
+// Make sure withCors is the outermost middleware to handle CORS properly
+exports.handler = withCors(withAuth(withDatabase(handler), { requireAuth: true }));

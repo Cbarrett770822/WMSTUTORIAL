@@ -2,7 +2,7 @@ const { connectToDatabase } = require('./utils/mongodb');
 const mongoose = require('mongoose');
 
 // Use the correct MongoDB Atlas connection string
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://charlesbtt7722:8LwMaauBS4Opqody@cluster0.eslgbjq.mongodb.net/test';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://charlesbtt7722:8LwMaauBS4Opqody@cluster0.eslgbjq.mongodb.net/wms-tutorial?retryWrites=true&w=majority';
 
 exports.handler = async (event, context) => {
   console.log('Test DB Connection function called');

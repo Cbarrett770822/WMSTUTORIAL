@@ -15,7 +15,7 @@ const Presentation = require('./models/Presentation');
 const isDevelopment = process.env.NODE_ENV === 'development';
 
 // Ensure we're using the correct MongoDB connection string
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://user:password@cluster.mongodb.net/wms-tutorial?retryWrites=true&w=majority';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://charlesbtt7722:8LwMaauBS4Opqody@cluster0.eslgbjq.mongodb.net/wms-tutorial?retryWrites=true&w=majority';
 console.log('Using MongoDB URI:', MONGODB_URI.substring(0, 20) + '...');
 
 /**
