@@ -90,23 +90,71 @@ const processProcessesData = async (workbook) => {
       console.log(`Found ${beforeAfterData.length} before/after items in Excel`);
     }
     
+    // Delete all existing processes before inserting new ones
+    console.log('BEFORE DELETION: Checking existing Process documents in the database...');
+    const existingCount = await Process.countDocuments({});
+    console.log(`Found ${existingCount} existing Process documents`);
+    
+    // Use deleteMany to remove all Process documents first
+    console.log('Deleting all existing Process documents...');
+    const deleteResult = await Process.deleteMany({});
+    console.log(`Deletion result: ${deleteResult.deletedCount} documents deleted`);
+    
+    // Double check deletion happened properly
+    const remainingCount = await Process.countDocuments({});
+    console.log(`AFTER DELETION: ${remainingCount} Process documents remain`);
+    
+    if (remainingCount > 0) {
+      console.log('WARNING: Not all Process documents were deleted! Using direct MongoDB client as fallback...');
+      
+      // Use a direct MongoDB client to delete all processes as a fallback
+      try {
+        const client = await MongoClient.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+        const db = client.db();
+        const collection = db.collection('processes');
+        
+        const collectionDeleteResult = await collection.deleteMany({});
+        console.log(`Collection-level deletion result: ${collectionDeleteResult.deletedCount} documents deleted`);
+        
+        // Final check
+        const finalCount = await Process.countDocuments({});
+        console.log(`FINAL CHECK: ${finalCount} Process documents remain after collection-level deletion`);
+        
+        await client.close();
+      } catch (mongoError) {
+        console.error('Error during direct MongoDB deletion:', mongoError);
+      }
+    }
+    
     // Normalize and map data
     const normalizedProcesses = processesData.map(process => {
-      // Generate a consistent ID for the process
-      const processId = generateConsistentId(process);
+      // Preserve the original MongoDB ObjectID from Excel instead of generating a new one
+      const processId = process.id || generateConsistentId(process);
       
-      // Find steps for this process
+      // Find steps for this process with flexible matching to handle various ID formats
       const processSteps = stepsData
-        .filter(step => step.processId === process.id)
+        .filter(step => {
+          return (
+            step.processId === process.id ||
+            (step.processId && process._id && step.processId === process._id.toString()) ||
+            (step.processId && process.id && 
+              (step.processId.startsWith(process.id) || process.id.startsWith(step.processId)))
+          );
+        })
         .map(step => {
           // Log video URL if present
           if (step.videoUrl) {
             console.log(`Found video URL for step ${step.id || step.title}: ${step.videoUrl}`);
           }
           
-          // Create a base step object with required fields
+          // Log video URL if present
+          if (step.videoUrl) {
+            console.log(`Found video URL for step ${step.id || step.title}: ${step.videoUrl}`);
+          }
+          
+          // Create a base step object with required fields - preserve original IDs
           const stepObj = {
-            id: step.id || `step-${Math.floor(Math.random() * 10000)}`,
+            id: step.id || `step-${Math.floor(Math.random() * 10000)}`,  // Preserve original step ID
             title: step.title || '',
             description: step.description || '',
             order: step.order || 0,
@@ -165,9 +213,21 @@ const processProcessesData = async (workbook) => {
     const deleteResult = await Process.deleteMany({});
     console.log(`Deleted ${deleteResult.deletedCount} processes`);
     
+    // Final verification that all old processes are gone
+    const verifyCount = await Process.countDocuments({});
+    if (verifyCount > 0) {
+      console.error(`CRITICAL ERROR: Failed to delete all processes. ${verifyCount} documents still exist before insert.`);
+    } else {
+      console.log('Verified all processes were deleted successfully. Ready to insert new data.');
+    }
+    
     // Insert new processes
     const insertResult = await Process.insertMany(normalizedProcesses);
     console.log(`Inserted ${insertResult.length} processes`);
+    
+    // Verify inserted documents
+    const finalProcessCount = await Process.countDocuments({});
+    console.log(`Final process count: ${finalProcessCount}`);
     
     return {
       success: true,
