@@ -196,21 +196,25 @@ const findSheetByName = (workbook, name) => {
 /**
  * Process Excel data for processes and steps
  */
-const processProcessesData = async (workbook, dbContext) => {
+const processProcessesData = async (workbook, userId, options = {}) => {
   try {
-    console.log('Processing processes data from Excel...');
+    console.log('Starting processProcessesData function with userId:', userId);
     
-    // Find the Processes sheet (case-insensitive)
+    // Find sheets for processes and steps
     const processesSheetName = findSheetByName(workbook, 'Processes');
-    if (!processesSheetName) {
-      throw new Error('Processes sheet not found in Excel file');
+    const stepsSheetName = findSheetByName(workbook, 'Steps');
+    
+    if (!processesSheetName || !stepsSheetName) {
+      throw new Error('Required sheets not found in Excel file. Please make sure your Excel file contains both "Processes" and "Steps" sheets.');
     }
     
-    // Parse processes sheet
-    const processesSheet = workbook.Sheets[processesSheetName];
-    const processesData = xlsx.utils.sheet_to_json(processesSheet);
+    // Parse sheets into JSON
+    const processesData = xlsx.utils.sheet_to_json(workbook.Sheets[processesSheetName]);
+    const stepsData = xlsx.utils.sheet_to_json(workbook.Sheets[stepsSheetName]);
     
-    if (!processesData || processesData.length === 0) {
+    // Log the data for debugging
+    console.log(`Found ${processesData.length} processes and ${stepsData.length} steps in Excel`);
+    console.log('Sample process ID format:', processesData[0]?.id); {
       throw new Error('No process data found in Excel file');
     }
     
@@ -275,8 +279,10 @@ const processProcessesData = async (workbook, dbContext) => {
     
     // Normalize and map data
     const normalizedProcesses = processesData.map(process => {
-      // Use the original ID from Excel instead of generating a new one
-      const processId = process.id;
+      // CRITICAL: Preserve the exact original ID from Excel to maintain referential integrity
+      // This ensures that steps with processId references will maintain their associations
+      // DO NOT transform the ID in any way
+      const processId = process.id; // Use exact original ID from Excel
       
       // Log the process ID preservation for debugging
       console.log(`Preserving original process ID: ${processId}`);
@@ -401,8 +407,32 @@ const processProcessesData = async (workbook, dbContext) => {
       const beforeCount = await Process.countDocuments({});
       console.log(`Found ${beforeCount} existing processes before deletion`);
       
+      // List all process IDs before deletion for debugging
+      const existingProcesses = await Process.find({}, {id: 1, title: 1});
+      console.log('Existing process IDs before deletion:');
+      console.log(JSON.stringify(existingProcesses.map(p => ({id: p.id, title: p.title || p.name || ''}))));
+      
+      // CRITICAL: First use deleteMany with no filter to remove all processes
+      // This ensures a clean slate for the import
       const deleteResult = await Process.deleteMany({});
-      console.log(`Deleted ${deleteResult.deletedCount} processes`);
+      console.log(`MongoDB reported ${deleteResult.deletedCount} processes deleted`);
+      
+      // Double-check with collection-level deletion as a backup method if needed
+      const afterFirstDelete = await Process.countDocuments({});
+      if (afterFirstDelete > 0) {
+        console.log(`First deletion incomplete. Trying direct collection method...`);
+        const collectionDelete = await Process.collection.deleteMany({});
+        console.log(`Collection method deleted ${collectionDelete.deletedCount} additional processes`);
+      }
+      
+      // Final verification that database is empty before import
+      const afterDeleteCount = await Process.countDocuments({});
+      if (afterDeleteCount > 0) {
+        console.error(`ERROR: Deletion failed! Still have ${afterDeleteCount} processes in database`);
+        throw new Error(`Failed to delete all processes. ${afterDeleteCount} remain.`);
+      } else {
+        console.log('✅ Confirmed database is empty and ready for import.');
+      }
     } catch (deleteError) {
       console.error('Error deleting existing processes:', deleteError);
       throw new Error(`Failed to delete existing processes: ${deleteError.message}`);
