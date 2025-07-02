@@ -209,9 +209,9 @@ const processProcessesData = async (workbook) => {
       };
     });
     
-    // Delete existing processes
-    const deleteResult = await Process.deleteMany({});
-    console.log(`Deleted ${deleteResult.deletedCount} processes`);
+    // We already deleted the processes earlier, no need to delete again
+    // Keeping this log for clarity
+    console.log('Process documents already deleted in previous step');
     
     // Final verification that all old processes are gone
     const verifyCount = await Process.countDocuments({});
