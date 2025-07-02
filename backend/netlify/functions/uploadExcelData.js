@@ -217,30 +217,49 @@ const processProcessesData = async (workbook, dbContext) => {
     console.log(`Found ${processesData.length} processes in Excel`);
     console.log('Sample process data:', JSON.stringify(processesData[0]));
     
-    // Log sample step data if available to help with debugging
-    if (stepsSheetName) {
-      const stepsSheet = workbook.Sheets[stepsSheetName];
-      const sampleSteps = xlsx.utils.sheet_to_json(stepsSheet);
-      if (sampleSteps && sampleSteps.length > 0) {
-        console.log('Sample step data:', JSON.stringify(sampleSteps[0]));
-      }
-    }
-    
-    // Find optional sheets for steps, benefits, and before/after data
+    // Find and parse Steps sheet before validation
     const stepsSheetName = findSheetByName(workbook, 'Steps');
-    const benefitsSheetName = findSheetByName(workbook, 'Benefits');
-    const beforeAfterSheetName = findSheetByName(workbook, 'BeforeAfter');
-    
-    // Parse optional sheets if they exist
     let stepsData = [];
-    let benefitsData = [];
-    let beforeAfterData = [];
     
     if (stepsSheetName) {
       const stepsSheet = workbook.Sheets[stepsSheetName];
       stepsData = xlsx.utils.sheet_to_json(stepsSheet);
       console.log(`Found ${stepsData.length} steps in Excel`);
+      if (stepsData.length > 0) {
+        console.log('Sample step data:', JSON.stringify(stepsData[0]));
+      }
     }
+    
+    // VALIDATION: Check if all processes have an ID
+    const processesWithoutId = processesData.filter(process => !process.id);
+    if (processesWithoutId.length > 0) {
+      throw new Error(`Validation failed: ${processesWithoutId.length} processes are missing ID fields. Please add IDs to all processes and try again.`);
+    }
+    
+    // VALIDATION: Check if all steps have a processId
+    const stepsWithoutProcessId = stepsData.filter(step => !step.processId);
+    if (stepsWithoutProcessId.length > 0) {
+      throw new Error(`Validation failed: ${stepsWithoutProcessId.length} steps are missing processId fields. Please add processId to all steps and try again.`);
+    }
+    
+    // VALIDATION: Check if all step processIds match existing process IDs
+    const processIdSet = new Set(processesData.map(process => process.id));
+    const orphanedSteps = stepsData.filter(step => !processIdSet.has(step.processId));
+    if (orphanedSteps.length > 0) {
+      throw new Error(`Validation failed: ${orphanedSteps.length} steps reference process IDs that don't exist in the Processes sheet. Please fix these references and try again.`);
+    }
+    
+    // If all validations pass, continue with processing
+    console.log('All validations passed. Proceeding with import...');
+    
+    // Find optional sheets for benefits and before/after data
+    // (Steps sheet was already processed above for validation)
+    const benefitsSheetName = findSheetByName(workbook, 'Benefits');
+    const beforeAfterSheetName = findSheetByName(workbook, 'BeforeAfter');
+    
+    // Parse optional sheets if they exist
+    let benefitsData = [];
+    let beforeAfterData = [];
     
     if (benefitsSheetName) {
       const benefitsSheet = workbook.Sheets[benefitsSheetName];
@@ -256,11 +275,11 @@ const processProcessesData = async (workbook, dbContext) => {
     
     // Normalize and map data
     const normalizedProcesses = processesData.map(process => {
-      // Generate a consistent ID for the process
-      const processId = generateConsistentId(process);
+      // Use the original ID from Excel instead of generating a new one
+      const processId = process.id;
       
-      // Log the process ID mapping for debugging
-      logProcessIdMapping(process.id, processId);
+      // Log the process ID preservation for debugging
+      console.log(`Preserving original process ID: ${processId}`);
       
       // Find steps for this process
       // More flexible matching to handle different ID formats
@@ -376,7 +395,7 @@ const processProcessesData = async (workbook, dbContext) => {
     // Log the normalized processes
     console.log('Normalized processes:', JSON.stringify(normalizedProcesses.map(p => ({ id: p.id, title: p.title }))));
     
-    // Delete existing processes
+    // Delete existing processes - now safe to do since we've validated the Excel data
     try {
       console.log('Deleting existing processes...');
       const beforeCount = await Process.countDocuments({});
