@@ -76,6 +76,10 @@ const processProcessesData = async (workbook) => {
       const stepsSheet = workbook.Sheets[stepsSheetName];
       stepsData = xlsx.utils.sheet_to_json(stepsSheet);
       console.log(`Found ${stepsData.length} steps in Excel`);
+      // Enhanced logging: Log the first 3 steps and their videoUrl
+      stepsData.slice(0, 3).forEach((step, idx) => {
+        console.log(`[DIAG] Step ${idx+1}: id=${step.id}, processId=${step.processId}, title=${step.title}, videoUrl=${step.videoUrl}`);
+      });
     }
     
     if (benefitsSheetName) {
@@ -147,11 +151,6 @@ const processProcessesData = async (workbook) => {
             console.log(`Found video URL for step ${step.id || step.title}: ${step.videoUrl}`);
           }
           
-          // Log video URL if present
-          if (step.videoUrl) {
-            console.log(`Found video URL for step ${step.id || step.title}: ${step.videoUrl}`);
-          }
-          
           // Create a base step object with required fields - preserve original IDs
           const stepObj = {
             id: step.id || `step-${Math.floor(Math.random() * 10000)}`,  // Preserve original step ID
@@ -173,6 +172,14 @@ const processProcessesData = async (workbook) => {
           
           return stepObj;
         });
+      
+      // Enhanced logging: For each process, log all step IDs and videoUrls
+      if (processSteps.length > 0) {
+        console.log(`[DIAG] Process ${process.id || process.title}: Steps to insert:`);
+        processSteps.forEach((step, idx) => {
+          console.log(`    [DIAG] Step ${idx+1}: id=${step.id}, title=${step.title}, videoUrl=${step.videoUrl}`);
+        });
+      }
       
       // Find benefits for this process
       const processBenefits = benefitsData
