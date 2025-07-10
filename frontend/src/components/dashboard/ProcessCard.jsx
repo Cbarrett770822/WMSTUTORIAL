@@ -28,12 +28,21 @@ const iconMap = {
   'inventory_2': Inventory2Icon
 };
 
-// Map of categories to colors
-const categoryColorMap = {
-  'inbound': '#4caf50', // green
-  'storage': '#2196f3', // blue
-  'outbound': '#ff9800', // orange
-  'advanced': '#9c27b0'  // purple
+// Category color mapping
+const getCategoryColor = (category) => {
+  const categoryMap = {
+    'inbound': '#1976d2', // blue
+    'storage': '#2e7d32', // green
+    'outbound': '#d32f2f', // red
+    'advanced': '#9c27b0', // purple
+    'returns': '#9c27b0', // purple (same as advanced)
+    'general': '#757575'  // gray
+  };
+  
+  // Normalize category name to lowercase for comparison
+  const normalizedCategory = category?.toLowerCase() || 'general';
+  console.log(`Getting color for category: ${normalizedCategory}`);
+  return categoryMap[normalizedCategory] || '#757575'; // default gray
 };
 
 const ProcessCard = ({ process }) => {
@@ -86,10 +95,11 @@ const ProcessCard = ({ process }) => {
               position: 'absolute', 
               top: 8, 
               right: 8,
-              bgcolor: (process.category && categoryColorMap[process.category]) || 'primary.main',
+              bgcolor: getCategoryColor(process.category),
               color: 'white'
             }} 
           />
+          {/* Debug info removed */}
         </Box>
         <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
           <Typography gutterBottom variant="h5" component="div">
@@ -100,7 +110,7 @@ const ProcessCard = ({ process }) => {
           </Typography>
           <Box sx={{ mt: 'auto' }}>
             <Typography variant="caption" color="text.secondary">
-              {process.steps?.length || 0} process flow • {process.metrics?.length || 0} KPI metrics
+              {process.steps?.length || 0} process flow steps
             </Typography>
           </Box>
         </CardContent>

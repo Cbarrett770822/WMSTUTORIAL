@@ -8,9 +8,13 @@ import {
   Button, 
   CircularProgress,
   Alert,
-  AlertTitle
+  AlertTitle,
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
 
 const PptViewer = ({ presentation, width = '100%', height = '600px' }) => {
   const isAdmin = useSelector(selectIsAdmin);

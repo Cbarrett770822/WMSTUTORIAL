@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider, useSelector, useDispatch } from 'react-redux';
+import config from './config';
 
 // Import store
 import store from './app/store';
@@ -15,18 +16,20 @@ import * as unifiedSettingsService from './services/unifiedSettingsService';
 // Import components
 import Layout from './components/layout/Layout';
 import DarkHomePage from './components/common/DarkHomePage';
-import SettingsPage from './components/settings/SettingsPage';
-import ProcessesDashboard from './components/dashboard/ProcessesDashboard';
+import ProcessesDashboardFinal from './components/dashboard/ProcessesDashboardFinal';
 import FlowPage from './components/tutorials/FlowPage';
 import PresentationsPage from './components/common/PresentationsPage';
 import LoginPage from './components/auth/LoginPage';
 import UserProfile from './components/auth/UserProfile';
 import UserManagement from './components/admin/UserManagement';
+import SettingsPage from './components/settings/SettingsPage';
 import SettingsDebugger from './components/SettingsDebugger';
 import AdminToolsPage from './pages/AdminToolsPage';
 import ApiDiagnostics from './components/diagnostics/ApiDiagnostics';
 import AuthDebugger from './components/debug/AuthDebugger';
 import ProcessApiDebugger from './components/debug/ProcessApiDebugger';
+import BenefitsDebugger from './components/debug/BenefitsDebugger';
+import ProcessCategoryFixer from './components/dashboard/ProcessCategoryFixer';
 import ProcessListPage from './components/debug/ProcessListPage';
 import PresentationsApiDebugger from './components/debug/PresentationsApiDebugger';
 import PresentationDebugger from './components/debug/PresentationDebuggerFixed';
@@ -152,7 +155,7 @@ function AppContent() {
         <Route path="/processes" element={
           isAuthenticated ? 
           <Layout onLogout={handleLogout}>
-            <ProcessesDashboard />
+            <ProcessesDashboardFinal />
           </Layout> : 
           <Navigate to="/login" />
         } />
@@ -235,29 +238,54 @@ function AppContent() {
           </Layout>
         } />
         
-        <Route path="/debug/process-api" element={
-          <Layout onLogout={handleLogout}>
-            <ProcessApiDebugger />
-          </Layout>
-        } />
+        {/* Only render debug routes in development mode */}
+        {config.development.debugMode && (
+          <Route path="/debug/process-api" element={
+            <Layout onLogout={handleLogout}>
+              <ProcessApiDebugger />
+            </Layout>
+          } />
+        )}
         
-        <Route path="/debug/presentations-api" element={
-          <Layout onLogout={handleLogout}>
-            <PresentationsApiDebugger />
-          </Layout>
-        } />
+        {config.development.debugMode && (
+          <Route path="/debug/presentations-api" element={
+            <Layout onLogout={handleLogout}>
+              <PresentationsApiDebugger />
+            </Layout>
+          } />
+        )}
         
-        <Route path="/debug/role" element={
-          <Layout onLogout={handleLogout}>
-            <RoleDebugger />
-          </Layout>
-        } />
+        {config.development.debugMode && (
+          <Route path="/debug/role" element={
+            <Layout onLogout={handleLogout}>
+              <RoleDebugger />
+            </Layout>
+          } />
+        )}
         
-        <Route path="/debug/presentations" element={
-          <Layout onLogout={handleLogout}>
-            <PresentationDebugger />
-          </Layout>
-        } />
+        {config.development.debugMode && (
+          <Route path="/debug/presentations" element={
+            <Layout onLogout={handleLogout}>
+              <PresentationDebugger />
+            </Layout>
+          } />
+        )}
+        
+        {config.development.debugMode && (
+          <Route path="/debug/benefits" element={
+            <Layout onLogout={handleLogout}>
+              <BenefitsDebugger />
+            </Layout>
+          } />
+        )}
+        
+        {config.development.debugMode && (
+          <Route path="/debug/categories" element={
+            <Layout onLogout={handleLogout}>
+              <ProcessCategoryFixer />
+            </Layout>
+          } />
+        )}
         
         <Route path="/process-list" element={
           <AdminRoute>
