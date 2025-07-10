@@ -28,7 +28,7 @@ import AdminToolsPage from './pages/AdminToolsPage';
 import ApiDiagnostics from './components/diagnostics/ApiDiagnostics';
 import AuthDebugger from './components/debug/AuthDebugger';
 import ProcessApiDebugger from './components/debug/ProcessApiDebugger';
-import BenefitsDebugger from './components/debug/BenefitsDebugger';
+// Debug imports removed
 // Debug component imports removed
 import ProcessListPage from './components/debug/ProcessListPage';
 import PresentationsApiDebugger from './components/debug/PresentationsApiDebugger';
@@ -271,13 +271,7 @@ function AppContent() {
           } />
         )}
         
-        {config.development.debugMode && (
-          <Route path="/debug/benefits" element={
-            <Layout onLogout={handleLogout}>
-              <BenefitsDebugger />
-            </Layout>
-          } />
-        )}
+        {/* Debug benefits route removed */}
         
         {/* Debug routes removed */}
         
