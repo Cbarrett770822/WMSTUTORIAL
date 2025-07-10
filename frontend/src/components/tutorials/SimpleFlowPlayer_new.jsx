@@ -22,6 +22,7 @@ import {
   nextStep,
   previousStep
 } from '../../features/processes/processesSlice';
+import BenefitsCard from './BenefitsCard';
 
 const SimpleFlowPlayer = () => {
   const dispatch = useDispatch();
@@ -239,11 +240,12 @@ const SimpleFlowPlayer = () => {
   return (
     <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
       <Typography variant="h5" gutterBottom>
-        {process.title || process.name || 'Process Flow'}
+        {process.title || process.name || 'Process Flow'} - Updated Layout
       </Typography>
       
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
-        <Box sx={{ width: '100%' }}>
+        {/* Process Steps - Left side */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <Paper elevation={3} sx={{ p: 2, height: '100%' }}>
             <Typography variant="h6" gutterBottom>
               Process Flow
@@ -294,6 +296,11 @@ const SimpleFlowPlayer = () => {
               ))}
             </Stepper>
           </Paper>
+        </Box>
+        
+        {/* Benefits Card - Right side */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <BenefitsCard process={process} />
         </Box>
       </Box>
       
