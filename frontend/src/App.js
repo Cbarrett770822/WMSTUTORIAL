@@ -17,7 +17,7 @@ import * as unifiedSettingsService from './services/unifiedSettingsService';
 import Layout from './components/layout/Layout';
 import DarkHomePage from './components/common/DarkHomePage';
 import ProcessesDashboardFinal from './components/dashboard/ProcessesDashboardFinal';
-import FlowPage from './components/tutorials/FlowPage';
+import FlowPage from './components/tutorials/FlowPageNew';
 import PresentationsPage from './components/common/PresentationsPage';
 import LoginPage from './components/auth/LoginPage';
 import UserProfile from './components/auth/UserProfile';
