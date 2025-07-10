@@ -276,7 +276,7 @@ const EnhancedFlowPage = () => {
                             startIcon={<PlayArrowIcon />}
                             sx={{ mt: 1, mr: 1 }}
                           >
-                            Play
+                            Demonstrate
                           </Button>
                         )}
                         <Button
@@ -309,22 +309,7 @@ const EnhancedFlowPage = () => {
         </Box>
       </Box>
       
-      {/* Video URL Link - displayed at the bottom of the page */}
-      {hasVideo && (
-        <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Typography variant="body2" sx={{ mr: 1 }}>
-            Video URL:
-          </Typography>
-          <Link 
-            href={sharePointUrl || teamsUrl || videoUrl || youtubeEmbedUrl} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            sx={{ wordBreak: 'break-all', fontSize: '0.875rem', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}
-          >
-            {sharePointUrl || teamsUrl || videoUrl || (youtubeEmbedUrl && youtubeEmbedUrl.split('?')[0])}
-          </Link>
-        </Box>
-      )}
+      {/* Video URL Link removed as requested */}
     </Container>
   );
 };
