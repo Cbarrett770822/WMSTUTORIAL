@@ -10,7 +10,7 @@ import {
   Paper
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import SimpleFlowPlayer from './SimpleFlowPlayer';
+import SimpleFlowPlayer from './SimpleFlowPlayer_new';
 import { 
   selectProcess, 
   selectSelectedProcess 
