@@ -29,7 +29,7 @@ import ApiDiagnostics from './components/diagnostics/ApiDiagnostics';
 import AuthDebugger from './components/debug/AuthDebugger';
 import ProcessApiDebugger from './components/debug/ProcessApiDebugger';
 import BenefitsDebugger from './components/debug/BenefitsDebugger';
-import ProcessCategoryFixer from './components/dashboard/ProcessCategoryFixer';
+// Debug component imports removed
 import ProcessListPage from './components/debug/ProcessListPage';
 import PresentationsApiDebugger from './components/debug/PresentationsApiDebugger';
 import PresentationDebugger from './components/debug/PresentationDebuggerFixed';
@@ -279,13 +279,7 @@ function AppContent() {
           } />
         )}
         
-        {config.development.debugMode && (
-          <Route path="/debug/categories" element={
-            <Layout onLogout={handleLogout}>
-              <ProcessCategoryFixer />
-            </Layout>
-          } />
-        )}
+        {/* Debug routes removed */}
         
         <Route path="/process-list" element={
           <AdminRoute>
